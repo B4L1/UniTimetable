@@ -1,0 +1,82 @@
+[
+  {
+    "title": "Kriptográfia és adatbiztonság e.a. | Dr. Márton Gyöngyvér | E 114  E-200",
+    "x": 1200,
+    "y": 420,
+    "width": 427.5,
+    "height": 127.5,
+    "fill": "transparent"
+  },
+  {
+    "title": "Információ keresés e.a. | Dr. Iclănzan Dávid Andrei | E 230 E-100",
+    "x": 772.5,
+    "y": 420,
+    "width": 427.5,
+    "height": 127.5,
+    "fill": "transparent"
+  },
+  {
+    "title": "Kriptográfia és adatbiztonság gyak. | Dr. Márton Gyöngyvér | VM 317 Lab-24",
+    "x": 772.5,
+    "y": 675,
+    "width": 427.5,
+    "height": 255,
+    "fill": "transparent"
+  },
+  {
+    "title": "Kriptográfia és adatbiztonság e.a. | Dr. Márton Gyöngyvér | E 230 E-100",
+    "x": 1627.5,
+    "y": 675,
+    "width": 427.5,
+    "height": 255,
+    "fill": "transparent"
+  },
+  {
+    "title": "Osztálymenedzsment szem. | Dr. Horváth Zsófia | PEK C427 E-50",
+    "x": 2055,
+    "y": 802.5,
+    "width": 427.5,
+    "height": 127.5,
+    "fill": "transparent"
+  },
+  {
+    "title": "Mesterséges intelligencia e.a. | Dávid L. | E 231  E-100",
+    "x": 345,
+    "y": 675,
+    "width": 427.5,
+    "height": 255,
+    "fill": "transparent"
+  },
+  {
+    "title": "Osztálymenedzsment e.a. | Dr. Horváth Zsófia | E C06 E-90",
+    "x": 2055,
+    "y": 675,
+    "width": 427.5,
+    "height": 127.5,
+    "fill": "transparent"
+  },
+  {
+    "title": "Információ keresés gyak. | Naghi Mirtill Boglárka | INF 413 Lab-30",
+    "x": 1627.5,
+    "y": 930,
+    "width": 427.5,
+    "height": 127.5,
+    "fill": "transparent"
+  },
+  {
+    "title": "Mesterséges intelligencia gyak. | Csaholczi Szabolcs | INF 417 Lab-26",
+    "x": 1200,
+    "y": 930,
+    "width": 427.5,
+    "height": 255,
+    "fill": "transparent"
+  },
+  {
+    "title": "Osztott rendszerek gyak. | Csaholczi Szabolcs | INF 417 Lab-26",
+    "x": 1627.5,
+    "y": 1057.5,
+    "width": 427.5,
+    "height": 127.5,
+    "fill": "transparent"
+  }
+]

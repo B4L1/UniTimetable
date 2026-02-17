@@ -1,0 +1,87 @@
+{
+  "tables": [],
+  "divWithLesson": [],
+  "potentialCells": [
+    {
+      "tag": "DIV",
+      "className": "skgd composite",
+      "text": "SAPIENTIA-EMTE\nMAROSVÁSÁRHELYI KAR\t\t\n\t\t\t\n\t\t\t\t\n\t\t\t\t\n\t\t\t\tMagyar (Hungarian)\n\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t+\n\t\t\t\t\t-\n\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t\tBejelentkezés",
+      "bgColor": "rgb(28, 113, 158)"
+    },
+    {
+      "tag": "DIV",
+      "className": "skgd composite skgdContainer",
+      "text": "SAPIENTIA-EMTE\nMAROSVÁSÁRHELYI KAR\t\t\n\t\t\t\n\t\t\t\t\n\t\t\t\t\n\t\t\t\tMagyar (Hungarian)\n\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t+\n\t\t\t\t\t-\n\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t\tBejelentkezés",
+      "bgColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "tag": "DIV",
+      "className": "skgd composite",
+      "text": "SAPIENTIA-EMTE\nMAROSVÁSÁRHELYI KAR",
+      "bgColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "tag": "SPAN",
+      "className": "skgd skgdLogoText",
+      "text": "SAPIENTIA-EMTE\nMAROSVÁSÁRHELYI KAR",
+      "bgColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "tag": "DIV",
+      "className": "skgd composite",
+      "text": "KapcsolatokSAPIENTIA HUNGARIAN UNIVERSITY OF TRANSYLVANIAoffice@ms.sapientia.ro(+40) 265-206-210Târgu-Mureş/Corunca (Marosvásárhely/Koronka), Calea Si",
+      "bgColor": "rgb(24, 95, 133)"
+    },
+    {
+      "tag": "DIV",
+      "className": "skgd composite skgdContainer",
+      "text": "KapcsolatokSAPIENTIA HUNGARIAN UNIVERSITY OF TRANSYLVANIAoffice@ms.sapientia.ro(+40) 265-206-210Târgu-Mureş/Corunca (Marosvásárhely/Koronka), Calea Si",
+      "bgColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "tag": "DIV",
+      "className": "skgd skgdli-skin_ListItem_2-skin_Text_2",
+      "text": "SAPIENTIA HUNGARIAN UNIVERSITY OF TRANSYLVANIA",
+      "bgColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "tag": "DIV",
+      "className": "skgd skgdli-skin_ListItem_2-skin_Text_2",
+      "text": "(+40) 265-206-210",
+      "bgColor": "rgba(0, 0, 0, 0)"
+    }
+  ],
+  "allTextContent": [],
+  "bodyChildren": [
+    {
+      "tag": "DIV",
+      "className": "eu-cookie-panel",
+      "id": ""
+    },
+    {
+      "tag": "DIV",
+      "className": "topDiv",
+      "id": ""
+    },
+    {
+      "tag": "DIV",
+      "className": "useChangeEvents",
+      "id": ""
+    },
+    {
+      "tag": "DIV",
+      "className": "useChangeEvents",
+      "id": ""
+    },
+    {
+      "tag": "svg",
+      "className": "",
+      "id": ""
+    },
+    {
+      "tag": "DIV",
+      "className": "asc dropDown",
+      "id": ""
+    }
+  ]
+}

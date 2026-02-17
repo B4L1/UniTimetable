@@ -1,0 +1,30 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../lib/api.ts",
+    "../lib/storage.ts",
+    "../lib/supabase.ts",
+    "../stores/**/*.ts",
+    "../constants/**/*.ts",
+    "../hooks/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../lib/utils.ts",
+    "../lib/colors.ts",
+    "../components/**",
+    "../app/**",
+    "../packages/**",
+    "../i18n/**"
+  ]
+}

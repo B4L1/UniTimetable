@@ -1,0 +1,66 @@
+.animated-list-container {
+    position: relative;
+    width: 100%;
+}
+
+.animated-list {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.animated-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.animated-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.animated-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+.animated-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.animated-list-item {
+    border-radius: 8px;
+}
+
+.animated-list-top-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(to bottom, rgba(18, 18, 26, 0.95), transparent);
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    border-radius: 10px 10px 0 0;
+}
+
+.animated-list-bottom-gradient {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: linear-gradient(to top, rgba(18, 18, 26, 0.95), transparent);
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    border-radius: 0 0 10px 10px;
+}

@@ -1,0 +1,19 @@
+{
+    "name": "unitimetable-scraper",
+    "version": "1.0.0",
+    "description": "Scraper for Sapientia EMTE edupage timetables",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "scrape": "node index.js",
+        "scrape:test": "node index.js --test",
+        "debug": "node debug.js"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.39.0",
+        "puppeteer": "^21.6.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0"
+    }
+}

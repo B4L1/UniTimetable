@@ -1,0 +1,147 @@
+/* ClassCard Component Styles */
+
+.class-card {
+    height: 100%;
+    padding: 10px 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-sizing: border-box;
+    position: relative;
+    z-index: 50;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0s linear 0.1s;
+}
+
+.class-card:hover {
+    z-index: 100 !important;
+    transition-delay: 0s;
+}
+
+/* Content wrapper */
+.class-card-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    /* Allow scrolling if content is too long */
+    scrollbar-width: none;
+    /* Hide scrollbar Firefox */
+    -ms-overflow-style: none;
+    /* Hide scrollbar IE/Edge */
+}
+
+.class-card-content::-webkit-scrollbar {
+    display: none;
+    /* Hide scrollbar Chrome/Safari/Brave */
+}
+
+/* Subject */
+.class-card-subject {
+    font-weight: 600;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--text-primary, white);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    margin-bottom: 4px;
+}
+
+[data-theme='faulty-terminal'] .class-card {
+    position: relative;
+    overflow: hidden;
+}
+
+[data-theme='faulty-terminal'] .class-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%,
+            rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg,
+            rgba(255, 0, 0, 0.06),
+            rgba(0, 255, 0, 0.02),
+            rgba(0, 0, 255, 0.06));
+    z-index: 2;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+}
+
+/* Teacher */
+.class-card-teacher {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin-top: 4px;
+}
+
+/* Footer (room + class name) */
+.class-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 6px;
+}
+
+/* Room */
+.class-card-room {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Class name */
+.class-card-classname {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* ============================================ */
+/* Variant: Compact */
+/* ============================================ */
+.class-card--compact {
+    padding: 10px 10px;
+    min-height: auto;
+}
+
+.class-card--compact:hover {
+    transform: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    opacity: 0.8;
+}
+
+.class-card--compact .class-card-subject {
+    font-size: 0.7rem;
+}
+
+.class-card--compact .class-card-teacher,
+.class-card--compact .class-card-room {
+    font-size: 0.65rem;
+}
+
+.class-card--compact .class-card-footer {
+    padding-top: 4px;
+}
+
+/* ============================================ */
+/* Variant: Dropdown */
+/* ============================================ */
+.class-card--dropdown {
+    min-height: 86px;
+    padding: 8px 10px;
+}
+
+.class-card--dropdown .class-card-subject {
+    margin-bottom: 6px;
+}
