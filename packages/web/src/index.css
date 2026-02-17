@@ -2,8 +2,8 @@
 
 :root {
   /* Colors - Dark Theme */
-  --bg-primary: #12121a;
-  --bg-secondary: #12121a;
+  --bg-primary: #050508;
+  --bg-secondary: #0f0f16;
   --bg-card: #1a1a24;
   --text-primary: #ffffff;
   --text-secondary: #a0a0b0;
@@ -14,8 +14,8 @@
   --success: #22c55e;
 
   /* Glass effects - More solid frosty look */
-  --glass-bg: rgba(20, 20, 28, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(30, 32, 45, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.15);
 }
 
 [data-theme='faulty-terminal'],
@@ -659,8 +659,6 @@ select:focus {
 .planner-slot-cell .class-card {
   border-radius: 12px;
   /* Nest nicely inside the 12px outer radius */
-  box-shadow: none;
-  border: none;
   height: 100%;
   width: 100%;
 }
@@ -898,7 +896,7 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 5;
+  z-index: 200;
 }
 
 .half-slot-card-wrapper:hover .half-slot-delete-btn {

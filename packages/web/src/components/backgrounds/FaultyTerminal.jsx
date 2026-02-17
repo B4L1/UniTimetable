@@ -131,6 +131,8 @@ float digit(vec2 p){
     float f = n * 0.0625;
     
     float isOn = step(0.1, intensity - f);
+    // Subdivide the large cell into a 5x5 grid of small "pieces" with distinct gaps
+    isOn *= step(0.25, x) * step(x, 0.75) * step(0.25, y) * step(y, 0.75);
     float brightness = isOn * (0.2 + y * 0.8) * (0.75 + x * 0.25);
     
     return step(0.0, p.x) * step(p.x, 1.0) * step(0.0, p.y) * step(p.y, 1.0) * brightness;
@@ -221,18 +223,18 @@ function hexToRgb(hex) {
 
 export default function FaultyTerminal({
   scale = 1,
-  gridMul = [2, 1],
-  digitSize = 1.5,
-  timeScale = 0.3,
+  gridMul = [1.3, 1],
+  digitSize = 1.0,
+  timeScale = 0.075,
   pause = false,
   scanlineIntensity = 0.3,
   glitchAmount = 1,
   flickerAmount = 1,
-  noiseAmp = 0,
+  noiseAmp = 2.0,
   chromaticAberration = 0,
   dither = 0,
   curvature = 0.2,
-  tint = '#ffffff',
+  tint = '#00ff41',
   mouseReact = true,
   mouseStrength = 0.2,
   dpr = Math.min(window.devicePixelRatio || 1, 2),

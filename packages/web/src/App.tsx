@@ -74,6 +74,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('timetable');
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
+  const [includeCrossMajor, setIncludeCrossMajor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const plannerSaveRef = useRef<(() => void) | null>(null);
 
@@ -183,31 +184,63 @@ function App() {
                   {selectionCount} óra
                 </span>
               )}
-              {activeTab === 'planner' && (
-                <input
-                  type="text"
-                  value={plannerSearchQuery}
-                  onChange={(e) => setPlannerSearchQuery(e.target.value)}
-                  placeholder="Típus keresés..."
-                  style={{
-                    minWidth: '220px',
-                    maxWidth: '360px',
-                    width: '32vw',
-                    padding: '6px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-secondary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.82rem',
-                    outline: 'none'
-                  }}
-                />
-              )}
             </div>
           )}
         </div>
 
-        <Dock items={dockItems} itemSize={42} />
+        <Dock items={dockItems} itemSize={42}>
+          {activeTab === 'planner' && (
+            <>
+              <input
+                type="text"
+                value={plannerSearchQuery}
+                onChange={(e) => setPlannerSearchQuery(e.target.value)}
+                placeholder="Típus keresés..."
+                style={{
+                  minWidth: '140px',
+                  maxWidth: '200px',
+                  width: '14vw',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(26, 26, 36, 0.6)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  height: '42px', // Match Dock item size
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                userSelect: 'none',
+                background: 'rgba(26, 26, 36, 0.6)',
+                padding: '0 12px',
+                borderRadius: '10px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                height: '42px', // Match Dock item size
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(40, 40, 50, 0.8)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(26, 26, 36, 0.6)'}
+              >
+                <input
+                  type="checkbox"
+                  checked={includeCrossMajor}
+                  onChange={(e) => setIncludeCrossMajor(e.target.checked)}
+                  style={{ accentColor: 'var(--accent)', width: '14px', height: '14px' }}
+                />
+                <span style={{ whiteSpace: 'nowrap' }}>Bővített</span>
+              </label>
+            </>
+          )}
+        </Dock>
       </header>
 
       {/* Content */}
@@ -220,6 +253,8 @@ function App() {
             onSavingChange={setIsSaving}
             classTypeSearch={plannerSearchQuery}
             onClassTypeSearchChange={setPlannerSearchQuery}
+            includeCrossMajor={includeCrossMajor}
+            onIncludeCrossMajorChange={setIncludeCrossMajor}
           />
         )}
         {activeTab === 'settings' && <Settings />}

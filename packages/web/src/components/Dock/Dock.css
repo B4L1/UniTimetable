@@ -105,3 +105,28 @@
     border-color: rgba(0, 0, 0, 0.1);
     color: #1a1a24;
 }
+
+.dock-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 8px;
+    margin-right: 4px;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    height: 100%;
+}
+
+
+.dock-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 8px;
+    margin-right: 4px;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    height: 100%;
+}
+
+.light-mode .dock-content {
+    border-color: rgba(0, 0, 0, 0.1);
+}

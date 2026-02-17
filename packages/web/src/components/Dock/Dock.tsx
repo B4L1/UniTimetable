@@ -21,6 +21,7 @@ export type DockProps = {
     items: DockItemData[];
     className?: string;
     itemSize?: number;
+    children?: React.ReactNode;
 };
 
 type DockItemProps = {
@@ -115,22 +116,19 @@ function DockIcon({ children, className = '' }: DockIconProps) {
 export default function Dock({
     items,
     className = '',
-    itemSize = 42
+    itemSize = 42,
+    children
 }: DockProps) {
     return (
         <div className="dock-outer">
             <div
                 className={`dock-panel ${className}`}
                 role="toolbar"
-                aria-label="Application dock"
             >
+                {children && <div className="dock-content">{children}</div>}
+
                 {items.map((item, index) => (
-                    <DockItem
-                        key={index}
-                        onClick={item.onClick}
-                        className={item.className}
-                        size={itemSize}
-                    >
+                    <DockItem key={`dock-item-${index}`} className={item.className} onClick={item.onClick} size={itemSize}>
                         <DockIcon>{item.icon}</DockIcon>
                         <DockLabel>{item.label}</DockLabel>
                     </DockItem>
