@@ -33,7 +33,8 @@ export type BackgroundTheme =
     | 'dither'
     | 'faulty-terminal'
     | 'iridescence'
-    | 'liquid-chrome';
+    | 'liquid-chrome'
+    | 'sapientia';
 
 export interface Preferences {
     theme: 'dark' | 'light';

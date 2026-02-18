@@ -331,14 +331,11 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
         transition: isEntering
             ? 'none' // Instant jump to start position
             : 'top 1.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease-in-out', // Smooth glide to target or out
-        height: '2px',
-        background: '#ef4444',
-        boxShadow: 'none',
         pointerEvents: 'none',
         transform: 'translateZ(0)' // Force new layer to avoid backdrop-filter glitch
     };
 
-    return <div style={style} />;
+    return <div className="time-marker" style={style} />;
 }
 
 function usePrevious(value: boolean) {

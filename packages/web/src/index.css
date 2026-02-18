@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./themes/sapientia.css";
 
 :root {
   /* Colors - Dark Theme */

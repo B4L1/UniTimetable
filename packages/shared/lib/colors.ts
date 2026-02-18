@@ -1,7 +1,7 @@
 // Bold color palette for timetable entries
 // Each unique subject (base name) gets a unique color via sequential assignment
 
-export const SUBJECT_COLORS = [
+export const DEFAULT_SUBJECT_COLORS = [
     // Cool & Bold
     '#3A86FF', // Electric Blue
     '#00D1FF', // Vivid Cyan
@@ -27,9 +27,20 @@ export const SUBJECT_COLORS = [
     '#A44CD3', // Deep Orchid
 ];
 
+let activePalette = [...DEFAULT_SUBJECT_COLORS];
+
 // Cache for sequential color assignments - ensures each subject gets a unique color
 const colorAssignments = new Map<string, string>();
 let nextColorIndex = 0;
+
+export function setSubjectPalette(colors: string[] | null): void {
+    if (!colors || colors.length === 0) {
+        activePalette = [...DEFAULT_SUBJECT_COLORS];
+    } else {
+        activePalette = [...colors];
+    }
+    resetColorAssignments();
+}
 
 // Extract base subject name by removing common suffixes like "e.a.", "szem.", "gyak.", etc.
 export function getBaseSubjectName(fullName: string): string {
@@ -54,7 +65,7 @@ export function getSubjectColor(subjectName: string): string {
     }
 
     // Assign the next available color
-    const color = SUBJECT_COLORS[nextColorIndex % SUBJECT_COLORS.length];
+    const color = activePalette[nextColorIndex % activePalette.length];
     colorAssignments.set(baseName, color);
     nextColorIndex++;
 

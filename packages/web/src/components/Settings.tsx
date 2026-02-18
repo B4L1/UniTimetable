@@ -6,15 +6,14 @@ import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacul
 import type { ClassData, BackgroundTheme } from '@shared/lib/types';
 
 const BACKGROUND_THEMES: { id: BackgroundTheme; label: string; icon: string }[] = [
-    { id: 'none', label: 'Nincs', icon: '🚫' },
+    { id: 'none', label: 'Sötét', icon: '🌑' },
     { id: 'silk', label: 'Silk', icon: '🧵' },
     { id: 'aurora', label: 'Aurora', icon: '🌌' },
 
     { id: 'pixel-blast', label: 'Pixel Blast', icon: '👾' },
-    { id: 'beams', label: 'Beams', icon: '✨' },
-    { id: 'dither', label: 'Dither', icon: '📺' },
     { id: 'iridescence', label: 'Iridescence', icon: '🌈' },
     { id: 'liquid-chrome', label: 'Liquid Chrome', icon: '💎' },
+    { id: 'sapientia', label: 'Sapientia', icon: '🏛️' },
     { id: 'faulty-terminal', label: 'Faulty Terminal', icon: '💻' },
 ];
 

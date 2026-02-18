@@ -1,0 +1,228 @@
+[data-theme='sapientia'],
+body[data-theme='sapientia'] {
+    --sap-green: #0A6C42;
+    --sap-green-light: #34d399;
+    --sap-navy: #1e293b;
+    --sap-navy-light: #334155;
+    --sap-bg: #f1f5f9;
+    --sap-bg-alt: #f5f5f5;
+
+    /* Sapientia Extras */
+    --sap-orange: #F39200;
+    --sap-blue: #0054A6;
+    --sap-red: #A6192E;
+    --sap-teal: #00A0E3;
+    --sap-lime: #8FC31F;
+
+    /* Sapientia Extras */
+    --sap-orange: #F39200;
+    --sap-blue: #0054A6;
+    --sap-red: #A6192E;
+    --sap-teal: #00A0E3;
+    --sap-lime: #8FC31F;
+
+    --bg-primary: var(--sap-bg);
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+
+    --accent: var(--sap-green);
+    --accent-hover: #085c38;
+    --border: #e2e8f0;
+    --success: #16a34a;
+    --error: #dc2626;
+
+    /* Solid styling */
+    --glass-bg: #ffffff;
+    --glass-border: #cbd5e1;
+
+    /* Card overrides */
+    --card-bg-override: #ffffff;
+    --card-border-override: #e2e8f0;
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Specific overrides for Sapientia theme */
+body[data-theme='sapientia'] .glass,
+body[data-theme='sapientia'] .glass-card,
+body[data-theme='sapientia'] .glass-header {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: var(--shadow-sm);
+    border-radius: 8px;
+    /* Sharper corners for academic look */
+}
+
+/* Header style - Clean White with Green Accent */
+body[data-theme='sapientia'] .app-header {
+    background: #ffffff;
+    border-bottom: 3px solid var(--sap-green);
+    box-shadow: var(--shadow-sm);
+}
+
+body[data-theme='sapientia'] .app-header h1 {
+    color: var(--sap-navy);
+    /* Navy text for title */
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+/* Dock/Nav items - The "Navbar section" */
+body[data-theme='sapientia'] .dock-panel {
+    background: var(--sap-navy-light) !important;
+    /* Navy Background from image */
+    border: none !important;
+    box-shadow: var(--shadow-lg) !important;
+    border-radius: 16px;
+    padding: 8px;
+    /* Add padding for buttons */
+}
+
+body[data-theme='sapientia'] .dock-item {
+    color: rgba(255, 255, 255, 0.7);
+    /* Light gray text on navy */
+    transition: all 0.2s ease;
+}
+
+body[data-theme='sapientia'] .dock-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    transform: translateY(-2px);
+}
+
+body[data-theme='sapientia'] .dock-item.active {
+    background: var(--sap-green);
+    /* Green selected state */
+    color: white !important;
+    box-shadow: 0 0 15px rgba(10, 108, 66, 0.5);
+    /* Glow effect */
+}
+
+/* CARDS - "Make the cards be those colors" (Assuming Green/Mint from Hallgatóknak) */
+/* We'll use a very subtle mint background for cards to distinguish from white page */
+body[data-theme='sapientia'] .settings-card,
+body[data-theme='sapientia'] .welcome-card {
+    background: #f0fdf4;
+    /* Mint green tint (emerald-50) */
+    border: 1px solid #bbf7d0;
+    /* Emerald-200 border */
+}
+
+/* Class Cards in Timetable */
+body[data-theme='sapientia'] .class-card {
+    border: none !important;
+    box-shadow: var(--shadow-md) !important;
+    /* Use the variable set by ClassCard.tsx inline style, but force it solid */
+    background: var(--subject-color) !important;
+    color: #ffffff !important;
+}
+
+/* Ensure text inherits white color */
+body[data-theme='sapientia'] .class-card-subject,
+body[data-theme='sapientia'] .class-card-teacher,
+body[data-theme='sapientia'] .class-card-room,
+body[data-theme='sapientia'] .class-card-classname {
+    color: inherit !important;
+    opacity: 0.95;
+}
+
+/* Day Headers */
+body[data-theme='sapientia'] .day-header {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    color: var(--sap-navy);
+    font-weight: 700;
+}
+
+body[data-theme='sapientia'] .day-header.today {
+    background: var(--sap-green);
+    color: white;
+    border-color: var(--sap-green);
+}
+
+/* Select inputs and forms */
+body[data-theme='sapientia'] select,
+body[data-theme='sapientia'] input[type="text"] {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+body[data-theme='sapientia'] select:focus,
+body[data-theme='sapientia'] input[type="text"]:focus {
+    border-color: var(--sap-green);
+    outline: 2px solid rgba(10, 108, 66, 0.2);
+}
+
+/* Toggle Switch */
+body[data-theme='sapientia'] .toggle {
+    background: #cbd5e1;
+}
+
+body[data-theme='sapientia'] .toggle.active {
+    background: var(--sap-green);
+}
+
+/* Navbar Search Input (Planner) */
+body[data-theme='sapientia'] .dock-panel input[type="text"] {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+body[data-theme='sapientia'] .dock-panel input[type="text"]::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+body[data-theme='sapientia'] .dock-panel input[type="checkbox"] {
+    accent-color: var(--sap-green);
+}
+
+body[data-theme='sapientia'] .dock-panel label {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Planner Hover Tints - Green for Sapientia */
+body[data-theme='sapientia'] .planner-slot-cell.clickable:not(.has-selection):hover,
+body[data-theme='sapientia'] .planner-slot-cell.clickable .empty-slot-plus:hover,
+body[data-theme='sapientia'] .planner-slot-cell.clickable .half-slot-plus:hover {
+    background: rgba(10, 108, 66, 0.15) !important;
+    border-color: rgba(10, 108, 66, 0.3);
+}
+
+/* Planner Empty Slot Icons */
+body[data-theme='sapientia'] .empty-slot-plus span,
+body[data-theme='sapientia'] .half-slot-plus span {
+    color: var(--sap-green) !important;
+    opacity: 0.8;
+}
+
+body[data-theme='sapientia'] .empty-slot-plus:hover span,
+body[data-theme='sapientia'] .half-slot-plus:hover span {
+    opacity: 1;
+    transform: scale(1.1);
+    color: var(--sap-green-light) !important;
+}
+
+/* Planner Search Highlights - Minty Green */
+body[data-theme='sapientia'] .planner-slot-cell.search-active.search-match {
+    border-color: var(--sap-green-light) !important;
+    background: rgba(52, 211, 153, 0.1) !important;
+    box-shadow: inset 0 0 0 2px var(--sap-green-light), 0 0 12px rgba(52, 211, 153, 0.2) !important;
+}
+
+/* Time Marker - Dark Green Gradient */
+body[data-theme='sapientia'] .time-marker {
+    background: linear-gradient(90deg,
+            rgba(10, 108, 66, 0) 0%,
+            rgba(10, 108, 66, 1) 15%,
+            rgba(10, 108, 66, 1) 85%,
+            rgba(10, 108, 66, 0) 100%) !important;
+    box-shadow: 0 0 8px rgba(10, 108, 66, 0.4) !important;
+    height: 2px !important;
+}

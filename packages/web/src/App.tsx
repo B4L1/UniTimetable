@@ -10,6 +10,7 @@ import Welcome from './components/Welcome';
 import Dock, { type DockItemData } from './components/Dock';
 import { formatClassName } from './utils/format';
 import type { BackgroundTheme } from '@shared/lib/types';
+import { setSubjectPalette } from '@shared/index';
 import './index.css';
 
 type Tab = 'timetable' | 'planner' | 'settings';
@@ -17,7 +18,7 @@ type Tab = 'timetable' | 'planner' | 'settings';
 // Theme list for cycling
 const BACKGROUND_THEMES: BackgroundTheme[] = [
   'none', 'silk', 'aurora', 'pixel-blast',
-  'beams', 'dither', 'iridescence', 'liquid-chrome', 'faulty-terminal'
+  'iridescence', 'liquid-chrome', 'sapientia', 'faulty-terminal'
 ];
 
 // Clean SVG icons
@@ -69,8 +70,23 @@ const SaveIcon = () => (
   </svg>
 );
 
+const SAPIENTIA_COLORS = [
+  '#C66952', '#789179', '#968DCA', '#7CA094', '#59777C',
+  '#B08D4B', '#37452B', '#8996DE', '#C66F76'
+];
+
 function App() {
   const { initialize, isLoading, preferences, updatePreferences, selectedClass, isFirstLaunch, isFaultyTerminalUnlocked } = useAppStore();
+
+  // Update color palette based on theme
+  useEffect(() => {
+    if (preferences.backgroundTheme === 'sapientia') {
+      setSubjectPalette(SAPIENTIA_COLORS);
+    } else {
+      setSubjectPalette(null);
+    }
+  }, [preferences.backgroundTheme]);
+
   const [activeTab, setActiveTab] = useState<Tab>('timetable');
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
