@@ -59,9 +59,11 @@ interface PlannerProps {
     onSavingChange?: (saving: boolean) => void;
     classTypeSearch?: string;
     onClassTypeSearchChange?: (value: string) => void;
+    includeCrossMajor: boolean;
+    onIncludeCrossMajorChange: (value: boolean) => void;
 }
 
-export default function Planner({ onSaveRef, onCountChange, onSavingChange, classTypeSearch = '', onClassTypeSearchChange }: PlannerProps) {
+export default function Planner({ onSaveRef, onCountChange, onSavingChange, classTypeSearch = '', onClassTypeSearchChange, includeCrossMajor, onIncludeCrossMajorChange }: PlannerProps) {
     const { selectedClass, userSelections, addSelection, removeSelection, clearSelections, importedSubjects } = useAppStore();
 
     const [availableClasses, setAvailableClasses] = useState<Map<string, AvailableClassEntry[]>>(new Map());
@@ -72,7 +74,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [dropdownPos, setDropdownPos] = useState<{ left: number; top?: number; bottom?: number; width: number } | null>(null);
-    const [includeCrossMajor, setIncludeCrossMajor] = useState(false);
+
 
     // Notify parent of saving changes
     useEffect(() => {
@@ -630,37 +632,8 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                 </div>
             )}
 
-            {/* Controls */}
-            <div className="planner-controls" style={{
-                marginBottom: '16px',
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                padding: '0 8px'
-            }}>
-                <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    cursor: 'pointer',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.9rem',
-                    userSelect: 'none'
-                }}>
-                    <input
-                        type="checkbox"
-                        checked={includeCrossMajor}
-                        onChange={(e) => setIncludeCrossMajor(e.target.checked)}
-                        style={{
-                            width: '16px',
-                            height: '16px',
-                            accentColor: 'var(--accent)'
-                        }}
-                    />
-                    Bővített keresés (más szakok is)
-                </label>
-            </div>
+            {/* Controls moved to Header */}
+
 
             {/* Planner Grid */}
             <div className={`planner-grid-wrapper ${selectedSlots.size === 0 ? 'empty' : ''}`} ref={wrapperRef} style={{ opacity: selectedSlots.size === 0 ? 0.3 : 1 }}>

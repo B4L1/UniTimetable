@@ -8,9 +8,10 @@ const Silk = lazy(() => import('./Silk'));
 // @ts-ignore
 const LiquidChromeComponent = lazy(() => import('./LiquidChrome.jsx'));
 // @ts-ignore
-const BeamsComponent = lazy(() => import('./Beams.jsx'));
 // @ts-ignore
-const DitherComponent = lazy(() => import('./Dither.jsx'));
+const BeamsComponent = lazy(() => import('./Beams'));
+// @ts-ignore
+const DitherComponent = lazy(() => import('./Dither'));
 // @ts-ignore
 const FaultyTerminalComponent = lazy(() => import('./FaultyTerminal.jsx'));
 // @ts-ignore
@@ -121,8 +122,8 @@ function BackgroundSelector({ theme }: BackgroundSelectorProps) {
         void import('./Aurora');
         void import('./Silk');
         void import('./LiquidChrome.jsx');
-        void import('./Beams.jsx');
-        void import('./Dither.jsx');
+        void import('./Beams');
+        void import('./Dither');
         void import('./FaultyTerminal.jsx');
         void import('./Iridescence.jsx');
         void import('./PixelBlast.jsx');
