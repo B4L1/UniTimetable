@@ -46,6 +46,16 @@ body[data-theme='faulty-terminal'] .dock-item.active {
   color: var(--bg-primary) !important;
 }
 
+[data-theme='faulty-terminal'] .time-marker {
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 1) 15%,
+      rgba(255, 255, 255, 1) 85%,
+      rgba(255, 255, 255, 0) 100%) !important;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.6) !important;
+  height: 2px !important;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -283,7 +293,6 @@ body[data-theme='faulty-terminal'] * {
   pointer-events: none;
   /* Stronger glow */
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
-  transition: top 0.3s ease-in-out;
 }
 
 /* Indicators removed per request */

@@ -1,6 +1,7 @@
 // Timetable component for web
 
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
 import { fetchTimetableEntries, fetchTimetableEntriesByIds } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
@@ -284,15 +285,18 @@ export default function Timetable() {
     );
 }
 
-// Separate component for easier animation lifecycle management
+// Separate component for robust animation lifecycle management using motion
 function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
-    const [isEntering, setIsEntering] = useState(false);
-    const prevShow = usePrevious(show);
+    const [resetKey, setResetKey] = useState(0);
 
-    // Initial position calculation (08:00 - 20:00 range)
-    // 08:00 = 480 min
-    // 20:00 = 1200 min
-    // Range = 720 min
+    // Force a fresh mount whenever the line is turned on to ensure it starts from the top
+    useEffect(() => {
+        if (show) {
+            setResetKey(prev => prev + 1);
+        }
+    }, [show]);
+
+    // Current position calculation (08:00 - 20:00 range)
     const getPosition = () => {
         const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
         const start = 480; // 08:00
@@ -301,48 +305,32 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
         return Math.min(100, Math.max(0, ((minutes - start) / range) * 100));
     };
 
-    const [currentPos, setCurrentPos] = useState(getPosition());
+    const currentPos = getPosition();
 
-    useEffect(() => {
-        setCurrentPos(getPosition());
-        // Update position every minute if valid
-    }, [currentTime]);
-
-    useEffect(() => {
-        if (show && !prevShow) {
-            // Turning ON: Start from top
-            setIsEntering(true);
-            // Wait a tick to apply the "start" position (top: -100%) before switching to real position
-            const timer = setTimeout(() => setIsEntering(false), 100);
-            return () => clearTimeout(timer);
-        }
-    }, [show, prevShow]);
-
-    const style: React.CSSProperties = {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 210,
-        // Animation Logic
-        top: show
-            ? (isEntering ? '-10%' : `${currentPos}%`)  // If entering, start above. If showing, go to proper time.
-            : '150%',                                   // If hiding, go well below.
-        opacity: show ? 1 : 0,
-        transition: isEntering
-            ? 'none' // Instant jump to start position
-            : 'top 1.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease-in-out', // Smooth glide to target or out
-        pointerEvents: 'none',
-        transform: 'translateZ(0)' // Force new layer to avoid backdrop-filter glitch
-    };
-
-    return <div className="time-marker" style={style} />;
-}
-
-function usePrevious(value: boolean) {
-    const ref = useRef<boolean>(value);
-    useEffect(() => {
-        ref.current = value;
-    });
-    return ref.current;
+    return (
+        <AnimatePresence>
+            {show && (
+                <motion.div
+                    key={resetKey}
+                    className="time-marker"
+                    initial={{ top: '-10%', opacity: 0 }}
+                    animate={{ top: `${currentPos}%`, opacity: 1 }}
+                    exit={{ top: '150%', opacity: 0 }}
+                    transition={{
+                        top: { duration: 1.5, ease: [0.22, 1, 0.36, 1] },
+                        opacity: { duration: 0.5 }
+                    }}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        zIndex: 210,
+                        pointerEvents: 'none',
+                        transform: 'translateZ(0)'
+                    }}
+                />
+            )}
+        </AnimatePresence>
+    );
 }
 
