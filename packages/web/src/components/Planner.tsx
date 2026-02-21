@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, type RefObject } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { fetchAvailableClassesForPlanner, fetchTimetableEntries } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
 import GlareHover from './GlareHover';
@@ -74,6 +75,40 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [dropdownPos, setDropdownPos] = useState<{ left: number; top?: number; bottom?: number; width: number } | null>(null);
+
+    // Mobile Carousel State
+    const today = new Date().getDay() - 1; // 0 = Monday
+    const [currentDayIndex, setCurrentDayIndex] = useState(today >= 0 && today < 5 ? today : 0);
+    const [direction, setDirection] = useState(0);
+
+    const paginate = (newDirection: number) => {
+        setDirection(newDirection);
+        setCurrentDayIndex(prev => {
+            const next = prev + newDirection;
+            if (next > 4) return 0;
+            if (next < 0) return 4;
+            return next;
+        });
+    };
+
+    const variants = {
+        enter: (direction: number) => ({
+            x: direction > 0 ? '100%' : '-100%',
+            opacity: 0
+        }),
+        center: {
+            zIndex: 1,
+            x: 0,
+            opacity: 1
+        },
+        exit: (direction: number) => ({
+            zIndex: 0,
+            x: direction < 0 ? '100%' : '-100%',
+            opacity: 0
+        })
+    };
+
+    const isMobile = useMediaQuery('(max-width: 768px)');
 
 
     // Notify parent of saving changes
@@ -616,6 +651,111 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         return matches;
     }, [availableClasses, normalizedSearch]);
 
+    // Shared rendering helpers
+    const renderCard = (entry: AvailableClassEntry, dayIndex: number, slotIndex: number, position: 'top' | 'bottom' | 'single') => {
+        const { startSlot, span } = getSpanInfo(entry, slotIndex);
+
+        // Deduplicate rendering: Only render if this slot is the actual start slot
+        if (slotIndex !== startSlot) {
+            // Render an invisible spacer so flex layout stays intact for the OTHER half
+            return <div key={`${entry.id}-spacer`} style={{ flex: 1, visibility: 'hidden' }} />;
+        }
+
+        const isEntryActive = activeSlot &&
+            activeSlot.day === dayIndex &&
+            activeSlot.slot >= startSlot &&
+            activeSlot.slot < startSlot + span;
+
+        const isAbsolute = span > 1;
+        let heightStr = undefined;
+        if (isAbsolute) {
+            const CELL_HEIGHT = 86;
+            const GAP = 4;
+            heightStr = `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`;
+        }
+
+        return (
+            <div
+                key={entry.id}
+                className={`half-slot-card-wrapper slot-${position} ${isEntryActive ? 'active' : ''}`}
+                style={{
+                    flex: isAbsolute ? undefined : 1,
+                    width: '100%',
+                    position: isAbsolute ? 'absolute' : 'relative',
+                    top: isAbsolute ? (position === 'bottom' ? '50%' : 0) : undefined,
+                    left: 0,
+                    right: 0,
+                    zIndex: isAbsolute ? 20 : 1,
+                    height: heightStr,
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleSlotClick(dayIndex, startSlot, entry.week_type === 'all' ? 'full' : entry.week_type as 'odd' | 'even');
+                }}
+            >
+                <ClassCard
+                    data={{
+                        id: entry.id,
+                        subjectName: entry.subject_name || 'Ismeretlen tárgy',
+                        teacherName: entry.teacher_name || '',
+                        classroom: entry.classroom || '',
+                        className: entry.class_name,
+                    }}
+                    showTeacher={entry.week_type === 'all' || span > 1}
+                    showRoom={entry.week_type === 'all' || span > 1}
+                    showClassName={entry.class_id !== selectedClass?.id}
+                    variant="compact"
+                />
+                <button
+                    className="half-slot-delete-btn"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        deleteEntry(dayIndex, startSlot, entry.id);
+                    }}
+                    title="Törlés"
+                >
+                    ×
+                </button>
+            </div>
+        );
+    };
+
+    const renderPlusButton = (dayIndex: number, slotIndex: number, half: 'odd' | 'even' | 'full', hasOptions: boolean) => (
+        <div
+            className={`half-slot-plus ${half !== 'full' ? `slot-${half === 'odd' ? 'top' : 'bottom'}` : 'empty-slot-plus'}`}
+            style={{ flex: 1 }}
+            onClick={(e) => {
+                e.stopPropagation();
+                if (hasOptions) handleSlotClick(dayIndex, slotIndex, half);
+            }}
+        >
+            {hasOptions && <span>+</span>}
+        </div>
+    );
+
+    const renderCellContent = (dayIndex: number, slotIndex: number, selectedEntries: AvailableClassEntry[], hasOptions: boolean) => {
+        const oddEntry = selectedEntries.find(e => e.week_type === 'odd');
+        const evenEntry = selectedEntries.find(e => e.week_type === 'even');
+        const fullEntry = selectedEntries.find(e => e.week_type === 'all');
+
+        const showOddPlaceholder = !oddEntry && !fullEntry && evenEntry;
+        const showEvenPlaceholder = !evenEntry && !fullEntry && oddEntry;
+        const isCovered = isSlotCovered(dayIndex, slotIndex);
+
+        if (fullEntry) return renderCard(fullEntry, dayIndex, slotIndex, 'single');
+
+        if (!oddEntry && !evenEntry) {
+            return !isCovered && (hasOptions || selectedEntries.length > 0) ? renderPlusButton(dayIndex, slotIndex, 'full', hasOptions) : null;
+        }
+
+        return (
+            <>
+                {oddEntry ? renderCard(oddEntry, dayIndex, slotIndex, 'top') : (showOddPlaceholder && hasOptions ? renderPlusButton(dayIndex, slotIndex, 'odd', hasOptions) : <div style={{ flex: 1 }} />)}
+                {evenEntry ? renderCard(evenEntry, dayIndex, slotIndex, 'bottom') : (showEvenPlaceholder && hasOptions ? renderPlusButton(dayIndex, slotIndex, 'even', hasOptions) : <div style={{ flex: 1 }} />)}
+            </>
+        );
+    };
+
     // Calculate dropdown options with visual grouping based on activeHalf
     const getAllOptions = () => getSlotOptions();
 
@@ -720,224 +860,177 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
             {/* Planner Grid */}
             <div className={`planner-grid-wrapper ${selectedSlots.size === 0 ? 'empty' : ''}`} ref={wrapperRef} style={{ opacity: selectedSlots.size === 0 ? 0.3 : 1 }}>
-                <div className="planner-grid" style={{
-                    display: 'grid',
-                    gridTemplateColumns: `80px repeat(${DAYS.length}, 1fr)`,
-                    gap: '4px'
+                <div className={`planner-grid-container ${isMobile ? 'mobile' : ''}`} style={{
+                    display: isMobile ? 'flex' : 'grid',
+                    flexDirection: isMobile ? 'column' : undefined,
+                    gridTemplateColumns: isMobile ? undefined : `80px repeat(${DAYS.length}, 1fr)`,
+                    gap: isMobile ? '32px' : '4px',
+                    height: isMobile ? '100%' : undefined
                 }}>
-                    {/* Corner cell */}
-                    <div className="glass-card" style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                            Időpont
-                        </span>
-                    </div>
-
-                    {/* Day headers */}
-                    {DAYS.map((day, index) => (
-                        <div
-                            key={day}
-                            className="day-header glass-card"
-                            style={{ background: 'var(--bg-card)' }}
-                        >
-                            {day}
-                        </div>
-                    ))}
-
-                    {/* Time slots and cells */}
-                    {TIME_SLOTS.map((slot, slotIndex) => (
-                        <div key={`row-${slotIndex}`} className="planner-row-group" style={{ display: 'contents' }}>
-                            {/* Time cell */}
-                            <div key={`time-${slotIndex}`} className="time-cell glass-card">
-                                <span className="time-label">{slot.label}</span>
-                                <span className="time-range">{slot.start}</span>
-                                <span className="time-range">{slot.end}</span>
+                    {!isMobile && (
+                        <>
+                            {/* Corner cell */}
+                            <div className="glass-card" style={{ padding: '12px', textAlign: 'center' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                                    Időpont
+                                </span>
                             </div>
 
-                            {/* Day cells */}
-                            {DAYS.map((_, dayIndex) => {
-                                const selectedEntries = getSelectedEntries(dayIndex, slotIndex);
-                                const hasOptions = (availableClasses.get(`${dayIndex}-${slotIndex}`) || []).length > 0;
-                                const isActive = activeSlot?.day === dayIndex && activeSlot?.slot === slotIndex;
-                                const cellKey = `${dayIndex}-${slotIndex}`;
+                            {/* Day headers */}
+                            {DAYS.map((day, index) => (
+                                <div
+                                    key={day}
+                                    className="day-header glass-card"
+                                    style={{ background: 'var(--bg-card)' }}
+                                >
+                                    {day}
+                                </div>
+                            ))}
+                        </>
+                    )}
 
-                                // Find specific entries
-                                const oddEntry = selectedEntries.find(e => e.week_type === 'odd');
-                                const evenEntry = selectedEntries.find(e => e.week_type === 'even');
-                                const fullEntry = selectedEntries.find(e => e.week_type === 'all');
+                    {isMobile ? (
+                        // Mobile Carousel (Single Day at a time)
+                        <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
+                            <AnimatePresence initial={false} custom={direction} mode="popLayout">
+                                <motion.div
+                                    key={currentDayIndex}
+                                    custom={direction}
+                                    variants={variants}
+                                    initial="enter"
+                                    animate="center"
+                                    exit="exit"
+                                    transition={{
+                                        x: { type: "spring", stiffness: 300, damping: 30 },
+                                        opacity: { duration: 0.2 }
+                                    }}
+                                    drag="x"
+                                    dragConstraints={{ left: 0, right: 0 }}
+                                    dragElastic={1}
+                                    onDragEnd={(e, { offset, velocity }) => {
+                                        const swipe = Math.abs(offset.x) > 50;
+                                        if (swipe) {
+                                            if (offset.x > 0) {
+                                                paginate(-1);
+                                            } else {
+                                                paginate(1);
+                                            }
+                                        }
+                                    }}
+                                    style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        right: 0,
+                                        height: '100%',
+                                        width: '100%'
+                                    }}
+                                >
+                                    <div className="planner-day-column" style={{ height: '100%' }}>
+                                        <div className="planner-column-header">
+                                            {DAYS[currentDayIndex]} {currentDayIndex === today && '(Ma)'}
+                                        </div>
+                                        <div className="planner-slots-stack">
+                                            {TIME_SLOTS.map((slot, slotIndex) => {
+                                                const cellKey = `${currentDayIndex}-${slotIndex}`;
+                                                const selectedEntries = getSelectedEntries(currentDayIndex, slotIndex);
+                                                const hasOptions = (availableClasses.get(cellKey) || []).length > 0;
+                                                const isActive = activeSlot?.day === currentDayIndex && activeSlot?.slot === slotIndex;
+                                                const isCovered = isSlotCovered(currentDayIndex, slotIndex);
+                                                const isSearchMatch = highlightedSlotKeys.has(cellKey);
+                                                const hasSelection = selectedEntries.length > 0;
 
-                                // Logic: If we have an odd entry but no even entry, show a placeholder for even
-                                // If we have an even entry but no odd entry, show a placeholder for odd
-                                const showOddPlaceholder = !oddEntry && !fullEntry && evenEntry;
-                                const showEvenPlaceholder = !evenEntry && !fullEntry && oddEntry;
+                                                return (
+                                                    <div key={`${currentDayIndex}-${slotIndex}`} style={{ display: 'contents' }}>
+                                                        <div className="mobile-time-label">
+                                                            <span>{slot.start}</span>
+                                                            <span>{slot.end}</span>
+                                                        </div>
 
-                                const hasSelection = selectedEntries.length > 0;
-                                const isSearchMatch = highlightedSlotKeys.has(cellKey);
-                                const isCovered = isSlotCovered(dayIndex, slotIndex);
+                                                        <div
+                                                            key={`slot-${currentDayIndex}-${slotIndex}`}
+                                                            ref={(el) => {
+                                                                if (el) cellRefs.current.set(cellKey, el);
+                                                            }}
+                                                            className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
+                                                            style={{
+                                                                background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
+                                                                borderColor: isActive && !hasSelection && !isCovered
+                                                                    ? 'var(--accent)'
+                                                                    : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
+                                                                opacity: activeSlot && !isActive ? 0.4 : 1,
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: 0,
+                                                                pointerEvents: isCovered ? 'none' : 'auto',
+                                                            }}
+                                                            onClick={() => {
+                                                                if (!hasSelection && hasOptions && !isCovered) {
+                                                                    handleSlotClick(currentDayIndex, slotIndex, 'full');
+                                                                }
+                                                            }}
+                                                        >
+                                                            {renderCellContent(currentDayIndex, slotIndex, selectedEntries, hasOptions)}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
+                    ) : (
+                        // Desktop grid rows
+                        TIME_SLOTS.map((slot, slotIndex) => (
+                            <div key={`row-${slotIndex}`} className="planner-row-group" style={{ display: 'contents' }}>
+                                {/* Time cell */}
+                                <div key={`time-${slotIndex}`} className="time-cell glass-card">
+                                    <span className="time-label">{slot.label}</span>
+                                    <span className="time-range">{slot.start}</span>
+                                    <span className="time-range">{slot.end}</span>
+                                </div>
 
-                                // Render helper for a half-slot card
-                                const renderCard = (entry: AvailableClassEntry, position: 'top' | 'bottom' | 'single') => {
-                                    const { startSlot, span } = getSpanInfo(entry, slotIndex);
-
-                                    // Deduplicate rendering: Only render if this slot is the actual start slot
-                                    if (slotIndex !== startSlot) {
-                                        // Render an invisible spacer so flex layout stays intact for the OTHER half
-                                        return <div key={`${entry.id}-spacer`} style={{ flex: 1, visibility: 'hidden' }} />;
-                                    }
-
-                                    const isEntryActive = activeSlot &&
-                                        activeSlot.day === dayIndex &&
-                                        activeSlot.slot >= startSlot &&
-                                        activeSlot.slot < startSlot + span;
-
-                                    const isAbsolute = span > 1;
-                                    let heightStr = undefined;
-                                    if (isAbsolute) {
-                                        // A cell comprises exactly 86px height based on index.css (.planner-slot-cell height: 86px)
-                                        // The planner grid gap is 4px.
-                                        const CELL_HEIGHT = 86;
-                                        const GAP = 4;
-
-                                        heightStr = position === 'single'
-                                            ? `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`
-                                            : `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`; // Even half-slots consume the full vertical space of their respective grid rows over the span
-                                    }
+                                {/* Day cells */}
+                                {DAYS.map((_, dayIndex) => {
+                                    const cellKey = `${dayIndex}-${slotIndex}`;
+                                    const selectedEntries = getSelectedEntries(dayIndex, slotIndex);
+                                    const hasOptions = (availableClasses.get(cellKey) || []).length > 0;
+                                    const isActive = activeSlot?.day === dayIndex && activeSlot?.slot === slotIndex;
+                                    const isCovered = isSlotCovered(dayIndex, slotIndex);
+                                    const isSearchMatch = highlightedSlotKeys.has(cellKey);
+                                    const hasSelection = selectedEntries.length > 0;
 
                                     return (
                                         <div
-                                            key={entry.id}
-                                            className={`half-slot-card-wrapper slot-${position} ${isEntryActive ? 'active' : ''}`}
-                                            style={{
-                                                flex: isAbsolute ? undefined : 1,
-                                                width: '100%',
-                                                position: isAbsolute ? 'absolute' : 'relative',
-                                                top: isAbsolute ? (position === 'bottom' ? '50%' : 0) : undefined,
-                                                left: 0,
-                                                right: 0,
-                                                zIndex: isAbsolute ? 20 : 1,
-                                                height: heightStr,
+                                            key={`slot-${dayIndex}-${slotIndex}`}
+                                            ref={(el) => {
+                                                if (el) cellRefs.current.set(cellKey, el);
                                             }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleSlotClick(dayIndex, startSlot, entry.week_type === 'all' ? 'full' : entry.week_type as 'odd' | 'even');
+                                            className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
+                                            style={{
+                                                background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
+                                                borderColor: isActive && !hasSelection && !isCovered
+                                                    ? 'var(--accent)'
+                                                    : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
+                                                opacity: activeSlot && !isActive ? 0.4 : 1,
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: 0,
+                                                pointerEvents: isCovered ? 'none' : 'auto',
+                                            }}
+                                            onClick={() => {
+                                                if (!hasSelection && hasOptions && !isCovered) {
+                                                    handleSlotClick(dayIndex, slotIndex, 'full');
+                                                }
                                             }}
                                         >
-                                            <ClassCard
-                                                data={{
-                                                    id: entry.id,
-                                                    subjectName: entry.subject_name || 'Ismeretlen tárgy',
-                                                    teacherName: entry.teacher_name || '',
-                                                    classroom: entry.classroom || '',
-                                                    className: entry.class_name,
-                                                }}
-                                                showTeacher={entry.week_type === 'all' || span > 1}
-                                                showRoom={entry.week_type === 'all' || span > 1}
-                                                showClassName={entry.class_id !== selectedClass?.id}
-                                                variant="compact"
-                                            />
-                                            <button
-                                                className="half-slot-delete-btn"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteEntry(dayIndex, startSlot, entry.id);
-                                                }}
-                                                title="Törlés"
-                                            >
-                                                ×
-                                            </button>
+                                            {renderCellContent(dayIndex, slotIndex, selectedEntries, hasOptions)}
                                         </div>
                                     );
-                                };
-
-                                // Render helper for empty half plus button
-                                const renderPlusButton = (half: 'odd' | 'even') => (
-                                    <div
-                                        className="half-slot-plus"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSlotClick(dayIndex, slotIndex, half);
-                                        }}
-                                    >
-                                        <span>+</span>
-                                    </div>
-                                );
-
-                                return (
-                                    <div
-                                        key={`slot-${dayIndex}-${slotIndex}`}
-                                        ref={(el) => {
-                                            if (el) cellRefs.current.set(cellKey, el);
-                                        }}
-                                        className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
-                                        style={{
-                                            background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
-                                            borderColor: isActive && !hasSelection && !isCovered
-                                                ? 'var(--accent)'
-                                                : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
-                                            opacity: activeSlot && !isActive ? 0.4 : 1,
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: 0,
-                                            pointerEvents: isCovered ? 'none' : 'auto',
-                                        }}
-                                        onClick={() => {
-                                            if (!hasSelection && hasOptions && !isCovered) {
-                                                handleSlotClick(dayIndex, slotIndex, 'full');
-                                            }
-                                        }}
-                                    >
-                                        {fullEntry ? (
-                                            renderCard(fullEntry, 'single')
-                                        ) : !oddEntry && !evenEntry ? (
-                                            // Completely empty slot with options
-                                            !isCovered && (
-                                                <div
-                                                    className="empty-slot-plus"
-                                                    style={{ flex: 1 }}
-                                                    onClick={(e) => {
-                                                        if (hasOptions) handleSlotClick(dayIndex, slotIndex, 'full');
-                                                    }}
-                                                >
-                                                    {hasOptions && <span>+</span>}
-                                                </div>
-                                            )
-                                        ) : (
-                                            <>
-                                                {oddEntry ? (
-                                                    renderCard({ ...oddEntry, week_type: 'odd' }, 'top')
-                                                ) : (
-                                                    <div
-                                                        className="half-slot-plus slot-top"
-                                                        style={{ flex: 1 }}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (hasOptions) handleSlotClick(dayIndex, slotIndex, 'odd');
-                                                        }}
-                                                    >
-                                                        {showOddPlaceholder && hasOptions && <span>+</span>}
-                                                    </div>
-                                                )}
-
-                                                {evenEntry ? (
-                                                    renderCard({ ...evenEntry, week_type: 'even' }, 'bottom')
-                                                ) : (
-                                                    <div
-                                                        className="half-slot-plus slot-bottom"
-                                                        style={{ flex: 1 }}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (hasOptions) handleSlotClick(dayIndex, slotIndex, 'even');
-                                                        }}
-                                                    >
-                                                        {showEvenPlaceholder && hasOptions && <span>+</span>}
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ))}
+                                })}
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 {activeSlot && (
@@ -995,7 +1088,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             />
                                         );
                                     }),
-                                    ...(hasSelectedInActiveSlot ? [
+                                    ...(activeSlot && getSelectedEntries(activeSlot.day, activeSlot.slot).length > 0 ? [
                                         <GlareHover
                                             key="clear-btn"
                                             background="rgba(239, 68, 68, 0.15)"
@@ -1008,11 +1101,14 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             transitionDuration={600}
                                             playOnce={false}
                                             className="dropdown-clear-btn"
+                                            onClick={() => {
+                                                selectClass(null);
+                                            }}
                                         >
                                             🗑️ Törlés
                                         </GlareHover>
                                     ] : []),
-                                    ...(dropdownOptions.length === 0 && hasSelectedInActiveSlot ? [
+                                    ...(dropdownOptions.length === 0 && activeSlot && getSelectedEntries(activeSlot.day, activeSlot.slot).length > 0 ? [
                                         <div key="empty-msg" className="dropdown-empty">
                                             Nincs más opció
                                         </div>

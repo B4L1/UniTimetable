@@ -893,7 +893,87 @@ select:focus {
 /* Responsive adjustments for Planner */
 @media (max-width: 768px) {
   .planner-container {
-    padding: 12px 16px;
+    padding: 12px 10px;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .planner-grid-wrapper {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    padding-bottom: 20px;
+  }
+
+  .planner-grid-container.mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    width: 100%;
+  }
+
+  .planner-day-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .planner-day-column .planner-column-header {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border-left: 4px solid var(--accent);
+    text-align: left;
+    margin-bottom: 4px;
+  }
+
+  [data-theme='sapientia'] .planner-day-column .planner-column-header {
+    border-left-color: var(--sap-green);
+  }
+
+  .planner-slots-stack {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 4px;
+    position: relative;
+  }
+
+  .mobile-time-labels {
+    display: contents;
+  }
+
+  .mobile-time-label {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 0;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    height: 86px;
+    box-sizing: border-box;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .mobile-time-label span:first-child {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+  }
+
+  .planner-slot-cell {
+    width: 100%;
+    min-width: 0;
+    height: 86px;
   }
 }
 
@@ -901,13 +981,22 @@ select:focus {
 .dropdown-divider {
   display: flex;
   align-items: center;
-  margin: 8px 0;
+  padding: 12px 16px;
+  margin: 4px 0;
   color: var(--text-secondary);
-  opacity: 0.7;
-  font-size: 0.7rem;
-  font-weight: 500;
+  opacity: 0.8;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.dropdown-divider span {
+  position: relative;
+  z-index: 1;
 }
 
 /* Adjustments for half-slot corner rounding */
