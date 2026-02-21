@@ -1,8 +1,9 @@
 // Timetable component for web
 
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { fetchTimetableEntries, fetchTimetableEntriesByIds } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
 import type { TimetableEntry } from '@shared/lib/types';
@@ -63,6 +64,8 @@ function getMinutes(timeStr: string): number {
 
 export default function Timetable() {
     const { selectedClass, timetableEntries, setTimetableEntries, userSelections, isLoading, preferences } = useAppStore();
+    const isMobile = useMediaQuery('(max-width: 768px)');
+    const carouselRef = useRef<HTMLDivElement>(null);
 
     // Track current time
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -113,6 +116,37 @@ export default function Timetable() {
         }
     }, [userSelections]);
 
+    // Mobile Carousel State
+    const [currentDayIndex, setCurrentDayIndex] = useState(today >= 0 && today < 5 ? today : 0);
+    const [direction, setDirection] = useState(0);
+
+    const paginate = (newDirection: number) => {
+        setDirection(newDirection);
+        setCurrentDayIndex(prev => {
+            const next = prev + newDirection;
+            if (next > 4) return 0;
+            if (next < 0) return 4;
+            return next;
+        });
+    };
+
+    const variants = {
+        enter: (direction: number) => ({
+            x: direction > 0 ? '100%' : '-100%',
+            opacity: 0
+        }),
+        center: {
+            zIndex: 1,
+            x: 0,
+            opacity: 1
+        },
+        exit: (direction: number) => ({
+            zIndex: 0,
+            x: direction < 0 ? '100%' : '-100%',
+            opacity: 0
+        })
+    };
+
     // Combine original entries + user selections
     // Strategy: User selections OVERRIDE original entries in the same time slot
     const entriesToDisplay = useMemo(() => {
@@ -150,22 +184,7 @@ export default function Timetable() {
         );
     }, [userSelections.length, userSelectedEntries, timetableEntries, currentWeekType]);
 
-    // Group entries by day and slot
-    const getEntriesForSlot = (dayIndex: number, slotIndex: number): AvailableClassEntry[] => {
-        const slot = TIME_SLOTS[slotIndex];
-        const slotStart = getMinutes(slot.start);
-        const slotEnd = getMinutes(slot.end);
-
-        return (filteredEntries as AvailableClassEntry[]).filter(entry => {
-            if (entry.day_of_week !== dayIndex) return false;
-
-            const entryStart = getMinutes(entry.start_time);
-            const entryEnd = getMinutes(entry.end_time);
-
-            // Overlap condition: max(start1, start2) < min(end1, end2)
-            return Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd);
-        });
-    };
+    // Grouping computation moved directly to renderer below
 
     if (isLoading || loadingSelections) {
         return (
@@ -184,62 +203,118 @@ export default function Timetable() {
         );
     }
 
-    return (
-        <div className="timetable-container">
-            <div className="timetable-grid" style={{
-                display: 'grid',
-                gridTemplateColumns: `80px repeat(${DAYS.length}, 1fr)`,
-                gap: '4px',
-                position: 'relative' // Needed for absolute positioning of TimeLine overlay
-            }}>
-                {/* Corner cell */}
-                <div className="glass-card" style={{ padding: '12px', textAlign: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                        {currentWeekType === 'odd' ? 'Páratlan' : 'Páros'} hét
-                    </span>
-                </div>
-
-                {/* Day headers */}
-                {DAYS.map((day, index) => (
-                    <div
-                        key={day}
-                        className={`day-header glass-card ${index === today ? 'today' : ''}`}
-                        style={{
-                            background: index === today
-                                ? 'var(--accent)'
-                                : 'var(--bg-card)',
-                        }}
-                    >
-                        {day}
-                        {index === today && <span style={{ fontSize: '0.7rem', marginLeft: '6px' }}>Ma</span>}
+    // Render for Web (Standard Grid)
+    if (!isMobile) {
+        return (
+            <div className="timetable-container">
+                <div className="timetable-grid" style={{
+                    display: 'grid',
+                    gridTemplateColumns: `80px repeat(${DAYS.length}, 1fr)`,
+                    gap: '4px',
+                    position: 'relative'
+                }}>
+                    {/* Corner cell */}
+                    <div className="glass-card" style={{ padding: '12px', textAlign: 'center', gridColumn: 1, gridRow: 1 }}>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                            {currentWeekType === 'odd' ? 'Páratlan' : 'Páros'} hét
+                        </span>
                     </div>
-                ))}
 
-                {/* Time slots and classes */}
-                {TIME_SLOTS.map((slot, slotIndex) => {
-                    return (
-                        <div key={`slot-row-${slotIndex}`} style={{ display: 'contents' }}>
-                            {/* Time cell */}
-                            <div className="time-cell glass-card">
-                                <span className="time-label">{slot.label}</span>
-                                <span className="time-range">{slot.start}</span>
-                                <span className="time-range">{slot.end}</span>
+                    {/* Day headers */}
+                    {DAYS.map((day, index) => (
+                        <div
+                            key={day}
+                            className={`day-header glass-card ${index === today ? 'today' : ''}`}
+                            style={{
+                                background: index === today
+                                    ? 'var(--accent)'
+                                    : 'var(--bg-card)',
+                                gridColumn: index + 2,
+                                gridRow: 1
+                            }}
+                        >
+                            {day}
+                            {index === today && <span style={{ fontSize: '0.7rem', marginLeft: '6px' }}>Ma</span>}
+                        </div>
+                    ))}
+
+                    {/* Time slots backgrounds */}
+                    {TIME_SLOTS.map((slot, slotIndex) => {
+                        return (
+                            <div key={`slot-row-${slotIndex}`} style={{ display: 'contents' }}>
+                                {/* Time cell */}
+                                <div className="time-cell glass-card" style={{ gridColumn: 1, gridRow: slotIndex + 2 }}>
+                                    <span className="time-label">{slot.label}</span>
+                                    <span className="time-range">{slot.start}</span>
+                                    <span className="time-range">{slot.end}</span>
+                                </div>
+
+                                {/* Day cells (Backgrounds) */}
+                                {DAYS.map((_, dayIndex) => {
+                                    return (
+                                        <div
+                                            key={`slot-bg-${dayIndex}-${slotIndex}`}
+                                            className="slot-cell"
+                                            style={{
+                                                background: 'var(--bg-secondary)',
+                                                gridColumn: dayIndex + 2,
+                                                gridRow: slotIndex + 2
+                                            }}
+                                        ></div>
+                                    );
+                                })}
                             </div>
+                        );
+                    })}
 
-                            {/* Day cells */}
-                            {DAYS.map((_, dayIndex) => {
-                                const entries = getEntriesForSlot(dayIndex, slotIndex);
-                                // Old marker logic removed from here
+                    {/* Render Classes */}
+                    {(() => {
+                        const grouped = new Map<string, AvailableClassEntry[]>();
+                        filteredEntries.forEach(entry => {
+                            if (entry.day_of_week === undefined) return;
 
-                                return (
-                                    <div
-                                        key={`slot-${dayIndex}-${slotIndex}`}
-                                        className="slot-cell"
-                                        style={{ background: 'var(--bg-secondary)' }}
-                                    >
-                                        {entries.map((entry) => (
+                            let startSlot = -1;
+                            let endSlot = -1;
+                            TIME_SLOTS.forEach((_, i) => {
+                                const slotStart = getMinutes(TIME_SLOTS[i].start);
+                                const slotEnd = getMinutes(TIME_SLOTS[i].end);
+                                const entryStart = getMinutes(entry.start_time);
+                                const entryEnd = getMinutes(entry.end_time);
+
+                                if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
+                                    if (startSlot === -1) startSlot = i;
+                                    endSlot = i;
+                                }
+                            });
+
+                            if (startSlot === -1) return;
+                            const span = endSlot - startSlot + 1;
+                            (entry as any)._calculatedSpan = span;
+
+                            const key = `${entry.day_of_week}-${startSlot}`;
+                            if (!grouped.has(key)) grouped.set(key, []);
+                            grouped.get(key)!.push(entry);
+                        });
+
+                        return Array.from(grouped.entries()).map(([key, groupEntries]) => {
+                            const [day, startSlot] = key.split('-').map(Number);
+                            const maxSpan = Math.max(...groupEntries.map(e => (e as any)._calculatedSpan));
+
+                            return (
+                                <div
+                                    key={`class-group-${key}`}
+                                    style={{
+                                        gridRow: `${startSlot + 2} / span ${maxSpan}`,
+                                        gridColumn: `${day + 2} / span 1`,
+                                        zIndex: 10,
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        gap: '4px',
+                                    }}
+                                >
+                                    {groupEntries.map(entry => (
+                                        <div key={entry.id} style={{ flex: 1, minWidth: 0, height: '100%' }}>
                                             <ClassCard
-                                                key={entry.id}
                                                 data={{
                                                     id: entry.id,
                                                     subjectName: entry.subject_name,
@@ -253,84 +328,234 @@ export default function Timetable() {
                                                 showClassName={entry.class_id !== selectedClass?.id}
                                                 variant="default"
                                             />
-                                        ))}
-                                    </div>
-                                );
-                            })}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        });
+                    })()}
+
+                    {/* Time Line Overlay */}
+                    {today >= 0 && today < 5 && preferences.showTimeIndicator && (
+                        <div
+                            style={{
+                                gridArea: `2 / ${today + 2} / 8 / ${today + 3}`,
+                                position: 'absolute',
+                                width: '100%',
+                                height: '100%',
+                                pointerEvents: 'none',
+                                zIndex: 200,
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <TimeLine
+                                show={preferences.showTimeIndicator}
+                                currentTime={currentTime}
+                            />
                         </div>
-                    );
-                })}
-
-                {/* Global Time Line Overlay - Animated */}
-                {today >= 0 && today < 5 && (
-                    <div
-                        style={{
-                            gridArea: `2 / ${today + 2} / 8 / ${today + 3}`, // Explicit RowStart / ColStart / RowEnd / ColEnd
-                            position: 'absolute',
-                            width: '100%',
-                            height: '100%',
-                            pointerEvents: 'none',
-                            zIndex: 200,
-                            overflow: 'hidden'     // Hide line when it flies out bottom
-                        }}
-                    >
-                        <TimeLine
-                            show={preferences.showTimeIndicator}
-                            currentTime={currentTime}
-                        />
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
-        </div >
-    );
-}
+        );
+    }
 
-// Separate component for robust animation lifecycle management using motion
-function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
-    const [resetKey, setResetKey] = useState(0);
-
-    // Force a fresh mount whenever the line is turned on to ensure it starts from the top
-    useEffect(() => {
-        if (show) {
-            setResetKey(prev => prev + 1);
-        }
-    }, [show]);
-
-    // Current position calculation (08:00 - 20:00 range)
-    const getPosition = () => {
-        const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-        const start = 480; // 08:00
-        const range = 720; // 12 hours
-        // Clamp between 0 and 100
-        return Math.min(100, Math.max(0, ((minutes - start) / range) * 100));
-    };
-
-    const currentPos = getPosition();
-
+    // Render for Mobile (Carousel)
     return (
-        <AnimatePresence>
-            {show && (
+        <div className="timetable-container" style={{ overflow: 'hidden', height: '100%', position: 'relative' }}>
+            <AnimatePresence initial={false} custom={direction} mode="popLayout">
                 <motion.div
-                    key={resetKey}
-                    className="time-marker"
-                    initial={{ top: '-10%', opacity: 0 }}
-                    animate={{ top: `${currentPos}%`, opacity: 1 }}
-                    exit={{ top: '150%', opacity: 0 }}
+                    key={currentDayIndex}
+                    custom={direction}
+                    variants={variants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
                     transition={{
-                        top: { duration: 1.5, ease: [0.22, 1, 0.36, 1] },
-                        opacity: { duration: 0.5 }
+                        x: { type: "spring", stiffness: 300, damping: 30 },
+                        opacity: { duration: 0.2 }
+                    }}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={1}
+                    onDragEnd={(e, { offset, velocity }) => {
+                        const swipe = Math.abs(offset.x) > 50;
+                        if (swipe) {
+                            if (offset.x > 0) {
+                                paginate(-1);
+                            } else {
+                                paginate(1);
+                            }
+                        }
                     }}
                     style={{
                         position: 'absolute',
                         left: 0,
                         right: 0,
-                        zIndex: 210,
-                        pointerEvents: 'none',
-                        transform: 'translateZ(0)'
+                        height: '100%',
+                        padding: '0 12px' // Increased padding for a better gutter
                     }}
-                />
-            )}
-        </AnimatePresence>
+                >
+                    <div className="mobile-day-column" style={{ height: '100%' }}>
+                        <div className="mobile-timetable-grid">
+                            {/* Header row for mobile grid */}
+                            <div className="glass-card" style={{
+                                gridColumn: 1,
+                                gridRow: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '4px',
+                                fontSize: '0.6rem',
+                                color: 'var(--text-secondary)',
+                                textAlign: 'center',
+                                borderRadius: '12px'
+                            }}>
+                                {currentWeekType === 'odd' ? 'Páratlan' : 'Páros'}
+                            </div>
+                            <div className={`mobile-day-header glass-card ${currentDayIndex === today ? 'today' : ''}`}
+                                style={{
+                                    background: currentDayIndex === today ? 'var(--accent)' : 'var(--bg-card)',
+                                    gridColumn: 2,
+                                    gridRow: 1,
+                                    marginBottom: 0
+                                }}>
+                                {DAYS[currentDayIndex]} {currentDayIndex === today && '(Ma)'}
+                            </div>
+
+                            {/* Time Slots + Cells */}
+                            {TIME_SLOTS.map((slot, slotIndex) => (
+                                <div key={`mobile-slot-${currentDayIndex}-${slotIndex}`} style={{ display: 'contents' }}>
+                                    <div className="mobile-time-cell glass-card" style={{ gridRow: slotIndex + 2, gridColumn: 1 }}>
+                                        <span className="time-label">{slot.label}</span>
+                                        <span className="time-range">{slot.start}</span>
+                                    </div>
+                                    <div className="slot-cell" style={{
+                                        background: 'var(--bg-secondary)',
+                                        gridColumn: 2,
+                                        gridRow: slotIndex + 2
+                                    }}></div>
+                                </div>
+                            ))}
+
+                            {/* Render Classes for this day */}
+                            {(() => {
+                                const dayEntries = filteredEntries.filter(e => e.day_of_week === currentDayIndex);
+                                const grouped = new Map<number, AvailableClassEntry[]>();
+
+                                dayEntries.forEach(entry => {
+                                    let startSlot = -1;
+                                    let endSlot = -1;
+                                    TIME_SLOTS.forEach((_, i) => {
+                                        const slotStart = getMinutes(TIME_SLOTS[i].start);
+                                        const slotEnd = getMinutes(TIME_SLOTS[i].end);
+                                        const entryStart = getMinutes(entry.start_time);
+                                        const entryEnd = getMinutes(entry.end_time);
+                                        if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
+                                            if (startSlot === -1) startSlot = i;
+                                            endSlot = i;
+                                        }
+                                    });
+
+                                    if (startSlot === -1) return;
+                                    const span = endSlot - startSlot + 1;
+                                    (entry as any)._calculatedSpan = span;
+
+                                    if (!grouped.has(startSlot)) grouped.set(startSlot, []);
+                                    grouped.get(startSlot)!.push(entry);
+                                });
+
+                                return Array.from(grouped.entries()).map(([startSlot, groupEntries]) => {
+                                    const maxSpan = Math.max(...groupEntries.map(e => (e as any)._calculatedSpan));
+                                    return (
+                                        <div
+                                            key={`mobile-group-${currentDayIndex}-${startSlot}`}
+                                            style={{
+                                                gridRow: `${startSlot + 2} / span ${maxSpan}`,
+                                                gridColumn: 2,
+                                                zIndex: 10,
+                                                display: 'flex',
+                                                gap: '4px',
+                                            }}
+                                        >
+                                            {groupEntries.map(entry => (
+                                                <div key={entry.id} style={{ flex: 1, minWidth: 0 }}>
+                                                    <ClassCard
+                                                        data={{
+                                                            id: entry.id,
+                                                            subjectName: entry.subject_name,
+                                                            teacherName: entry.teacher_name,
+                                                            teacherCode: entry.teacher_code,
+                                                            classroom: entry.classroom,
+                                                            className: entry.class_name,
+                                                        }}
+                                                        showTeacher={true}
+                                                        showRoom={true}
+                                                        variant="compact"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                });
+                            })()}
+
+                            {/* Time Line for this day column (only if it's today) */}
+                            {currentDayIndex === today && preferences.showTimeIndicator && (
+                                <div style={{
+                                    gridRow: '2 / span 6',
+                                    gridColumn: 2,
+                                    position: 'relative',
+                                    pointerEvents: 'none',
+                                    zIndex: 200
+                                }}>
+                                    <TimeLine
+                                        show={preferences.showTimeIndicator}
+                                        currentTime={currentTime}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            </AnimatePresence>
+        </div>
     );
+}
+
+// Fixed TimeLine component
+function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
+    const getPosition = () => {
+        const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+        const start = 480; // 08:00
+        const range = 720; // 12 hours
+        return Math.min(100, Math.max(0, ((minutes - start) / range) * 100));
+    };
+
+    const [currentPos, setCurrentPos] = useState(getPosition());
+
+    useEffect(() => {
+        setCurrentPos(getPosition());
+    }, [currentTime]);
+
+    if (!show) return null;
+
+    return (
+        <div
+            className="time-marker"
+            style={{
+                top: `${currentPos}%`,
+                opacity: 1,
+                // Transition only for smooth movement between minutes, not for mounting
+            }}
+        />
+    );
+}
+
+function usePrevious(value: boolean) {
+    const ref = useRef<boolean>(value);
+    useEffect(() => {
+        ref.current = value;
+    });
+    return ref.current;
 }
 

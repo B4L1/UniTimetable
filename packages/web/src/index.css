@@ -3,8 +3,8 @@
 
 :root {
   /* Colors - Dark Theme */
-  --bg-primary: #050508;
-  --bg-secondary: #0f0f16;
+  --bg-primary: #12121a;
+  --bg-secondary: #181824;
   --bg-card: #1a1a24;
   --text-primary: #ffffff;
   --text-secondary: #a0a0b0;
@@ -15,8 +15,8 @@
   --success: #22c55e;
 
   /* Glass effects - More solid frosty look */
-  --glass-bg: rgba(30, 32, 45, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-bg: rgba(20, 20, 28, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme='faulty-terminal'],
@@ -44,16 +44,6 @@ body[data-theme='faulty-terminal'] {
 
 body[data-theme='faulty-terminal'] .dock-item.active {
   color: var(--bg-primary) !important;
-}
-
-[data-theme='faulty-terminal'] .time-marker {
-  background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 1) 15%,
-      rgba(255, 255, 255, 1) 85%,
-      rgba(255, 255, 255, 0) 100%) !important;
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.6) !important;
-  height: 2px !important;
 }
 
 * {
@@ -275,25 +265,87 @@ body[data-theme='faulty-terminal'] * {
   position: relative;
   border-radius: 12px;
   padding: 0;
-  min-height: 80px;
+  min-height: 86px;
+  /* Match planner height */
 }
 
+/* Base time marker style - using local var for color */
 .time-marker {
+  --time-line-color: #ef4444;
+  --time-line-glow: rgba(239, 68, 68, 0.4);
   position: absolute;
   left: 0;
   right: 0;
   height: 2px;
-  /* Radiant gradient for the line */
   background: linear-gradient(90deg,
-      rgba(239, 68, 68, 0) 0%,
-      rgba(239, 68, 68, 1) 15%,
-      rgba(239, 68, 68, 1) 85%,
-      rgba(239, 68, 68, 0) 100%);
-  z-index: 20;
+      transparent 0%,
+      var(--time-line-color) 15%,
+      var(--time-line-color) 85%,
+      transparent 100%);
+  z-index: 200;
+  /* Higher z-index to be above grid */
   pointer-events: none;
-  /* Stronger glow */
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 8px var(--time-line-glow);
+  transition: top 0.3s ease-in-out;
 }
+
+
+/* Mobile Carousel Styles */
+@media (max-width: 768px) {
+  .timetable-container {
+    padding: 8px;
+    height: calc(100% - 60px);
+    /* Adjust for header/dock */
+    overflow: hidden;
+  }
+
+  .timetable-mobile-carousel {
+    display: block;
+    /* Use block for absolute children */
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: visible;
+    /* Let framer-motion handle overflow/positioning */
+    padding-bottom: 20px;
+  }
+
+  .mobile-day-column {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .mobile-timetable-grid {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 4px;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mobile-time-cell {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 86px;
+    font-size: 0.7rem;
+  }
+
+  .mobile-day-header {
+    margin-bottom: 8px;
+    padding: 12px;
+    text-align: center;
+    font-weight: 700;
+    border-radius: 12px;
+  }
+}
+
 
 /* Indicators removed per request */
 
@@ -632,6 +684,7 @@ select:focus {
 }
 
 .planner-slot-cell {
+  position: relative;
   border-radius: 12px;
   padding: 0;
   min-height: 86px;
@@ -640,21 +693,20 @@ select:focus {
   border: 2px solid transparent;
   transition: all 0.2s ease;
   cursor: default;
-  overflow: hidden;
-  /* Clip cards to the slot's radius */
+  /* overflow: hidden; removed to allow classes to span cells natively */
 }
 
 .planner-slot-cell.clickable {
   cursor: pointer;
 }
 
-.planner-slot-cell.clickable:not(.has-selection):hover {
+.planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
   border-color: rgba(99, 102, 241, 0.3);
   background: rgba(99, 102, 241, 0.1) !important;
 }
 
-.planner-slot-cell.active {
-  border-color: var(--accent) !important;
+.planner-slot-cell.active:not(.has-selection) {
+  border-color: var(--accent);
 }
 
 .planner-slot-cell.search-active {
@@ -668,9 +720,17 @@ select:focus {
 /* Custom card styling when inside the planner */
 .planner-slot-cell .class-card {
   border-radius: 12px;
-  /* Nest nicely inside the 12px outer radius */
+  /* Match the 12px outer radius precisely */
   height: 100%;
   width: 100%;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.planner-slot-cell .half-slot-card-wrapper.active .class-card {
+  border-color: var(--accent) !important;
+  /* Use a subtle inset shadow to keep the border crisp at the corners */
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.4);
 }
 
 .planner-slot-cell .half-slot-card-wrapper .class-card {
@@ -683,7 +743,7 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 10px;
   transition: background 0.2s ease;
 }
 
@@ -755,7 +815,7 @@ select:focus {
   justify-content: center;
   cursor: pointer;
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: 10px;
   transition: background 0.2s ease;
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-sizing: border-box;
@@ -778,14 +838,14 @@ select:focus {
 /* Planner Dropdown */
 .planner-dropdown {
   position: absolute;
-  z-index: 10;
+  z-index: 100;
   padding: 4px;
   max-height: 400px;
   overflow: hidden;
   animation: slideDown 0.2s ease;
-  background: rgba(18, 18, 26, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -842,7 +902,8 @@ select:focus {
   display: flex;
   align-items: center;
   margin: 8px 0;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
+  opacity: 0.7;
   font-size: 0.7rem;
   font-weight: 500;
   text-transform: uppercase;
@@ -867,7 +928,7 @@ select:focus {
 }
 
 .planner-slot-cell .slot-single .class-card {
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .dropdown-divider::before,
@@ -875,7 +936,7 @@ select:focus {
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border);
 }
 
 .dropdown-divider span {
