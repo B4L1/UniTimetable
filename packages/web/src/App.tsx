@@ -1,6 +1,6 @@
 // Main App component
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppStore } from './stores/appStore';
 import Timetable from './components/Timetable';
 import Planner from './components/Planner';
@@ -19,8 +19,8 @@ type Tab = 'timetable' | 'planner' | 'settings';
 
 // Theme list for cycling
 const BACKGROUND_THEMES: BackgroundTheme[] = [
-  'none', 'sapientia', 'silk', 'aurora', 'pixel-blast',
-  'beams', 'dither', 'iridescence', 'liquid-chrome', 'faulty-terminal'
+  'none', 'sapientia', 'aurora', 'pixel-blast',
+  'iridescence', 'liquid-chrome', 'faulty-terminal'
 ];
 
 // Clean SVG icons
@@ -108,10 +108,8 @@ function App() {
     }
   };
 
-  // Sync theme to body dataset and update color palette
-  useEffect(() => {
-    document.body.dataset.theme = preferences.backgroundTheme;
-
+  // Sync theme color palette synchronously before children render
+  useMemo(() => {
     // Apply Sapientia specific class colors
     if (preferences.backgroundTheme === 'sapientia') {
       const sapientiaPalette = [
@@ -133,6 +131,11 @@ function App() {
       setSubjectPalette(null); // Reset to default vibrant palette
     }
 
+  }, [preferences.backgroundTheme]);
+
+  // Handle DOM mutations safely after render
+  useEffect(() => {
+    document.body.dataset.theme = preferences.backgroundTheme;
   }, [preferences.backgroundTheme]);
 
   if (isLoading) {
@@ -243,6 +246,7 @@ function App() {
               <>
                 <input
                   type="text"
+                  className="planner-search-input"
                   value={plannerSearchQuery}
                   onChange={(e) => setPlannerSearchQuery(e.target.value)}
                   placeholder="Típus keresés..."
@@ -261,7 +265,7 @@ function App() {
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                   }}
                 />
-                <label style={{
+                <label className="planner-search-label" style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
