@@ -127,9 +127,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         }
     }, [selectedClass?.id, includeCrossMajor, importedSubjects]); // Added importedSubjects dependency
 
+    const syncedClassId = useRef<string | null>(null);
+
     // Load existing user selections into selectedSlots when availableClasses are loaded
     useEffect(() => {
-        if (userSelections.length > 0 && availableClasses.size > 0) {
+        if (selectedClass?.id && availableClasses.size > 0 && syncedClassId.current !== selectedClass.id) {
             const newSelectedSlots = new Map<string, AvailableClassEntry[]>();
 
             availableClasses.forEach((classes, key) => {
@@ -145,16 +147,19 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             });
 
             setSelectedSlots(newSelectedSlots);
+            syncedClassId.current = selectedClass.id;
         }
-    }, [userSelections, availableClasses]);
+    }, [userSelections, availableClasses, selectedClass?.id]);
 
     // Expose save function to parent via ref
     useEffect(() => {
         if (onSaveRef) {
+            // @ts-ignore
             onSaveRef.current = saveSelections;
         }
         return () => {
             if (onSaveRef) {
+                // @ts-ignore
                 onSaveRef.current = null;
             }
         };
@@ -229,13 +234,26 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             setActiveHalf(half);
 
             // Calculate dropdown position from cell's actual position
-            const cellEl = cellRefs.current.get(key);
+            // For multi-slot classes, we always anchor to the start slot
+            let targetSlotIndex = slotIndex;
+            const entries = getSelectedEntries(dayIndex, slotIndex);
+
+            // If the user clicked a slot that is COVERED by an absolute card, we should find that card's start
+            // and anchor the dropdown there. However, we already disabled clicks on covered slots.
+            // If the user clicks existing selection, anchor to its start slot.
+            if (entries.length > 0) {
+                const { startSlot } = getSpanInfo(entries[0], slotIndex);
+                targetSlotIndex = startSlot;
+            }
+
+            const targetKey = `${dayIndex}-${targetSlotIndex}`;
+            const cellEl = cellRefs.current.get(targetKey);
             const wrapperEl = wrapperRef.current;
             if (cellEl && wrapperEl) {
                 const cellRect = cellEl.getBoundingClientRect();
                 const wrapperRect = wrapperEl.getBoundingClientRect();
 
-                const isBottomRows = slotIndex >= TIME_SLOTS.length - 2;
+                const isBottomRows = targetSlotIndex >= TIME_SLOTS.length - 2;
 
                 setDropdownPos({
                     left: cellRect.left - wrapperRect.left - 4,
@@ -334,9 +352,18 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     console.log('Fallback 1: ID match count:', defaults.length);
                 }
 
-                // 2. Smart Name Match (Weighted Token Overlap)
+                // 2. Direct Name Match
                 if (defaults.length === 0 && selectedClass.name) {
-                    console.log('Fallback 2: Attempting Smart Name Match...');
+                    const exactMatch = available.filter(a => a.class_name === selectedClass.name);
+                    if (exactMatch.length > 0) {
+                        defaults = exactMatch;
+                        console.log('Fallback 2: Exact Name match count:', defaults.length);
+                    }
+                }
+
+                // 3. Smart Name Match (Weighted Token Overlap)
+                if (defaults.length === 0 && selectedClass.name) {
+                    console.log('Fallback 3: Attempting Smart Name Match...');
 
                     // Get all unique class names from available list
                     const candidateNames = Array.from(new Set(available.map(a => a.class_name).filter(Boolean))) as string[];
@@ -372,9 +399,15 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         if (bestName && bestScore > 0) {
                             defaults = available.filter(a => a.class_name === bestName);
                             console.log(`Fallback 2: Smart match found ${defaults.length} entries for ${bestName}`);
+                        } else {
+                            console.error(`Fallback failed. Target ID: ${selectedClass.id}, Target Name: ${selectedClass.name}. Available names:`, candidateNames);
                         }
                     }
                 }
+            }
+
+            if (defaults.length === 0) {
+                console.error("DEFAULTS IS STILL EMPTY. IT WILL NOT LOAD ANYTHING.");
             }
 
             const newSelectedSlots = new Map<string, AvailableClassEntry[]>();
@@ -453,7 +486,25 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const selectClass = (entry: AvailableClassEntry | null) => {
         if (!activeSlot) return;
 
-        const slotKey = `${activeSlot.day}-${activeSlot.slot}`;
+        let targetSlot = activeSlot.slot;
+        if (entry) {
+            // Find true start slot so multi-slot classes anchor to their correct start position
+            let entryStartSlot = -1;
+            TIME_SLOTS.forEach((_, i) => {
+                const slotStart = getMinutes(TIME_SLOTS[i].start);
+                const slotEnd = getMinutes(TIME_SLOTS[i].end);
+                const entryStart = getMinutes(entry.start_time);
+                const entryEnd = getMinutes(entry.end_time);
+                if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
+                    if (entryStartSlot === -1) entryStartSlot = i;
+                }
+            });
+            if (entryStartSlot !== -1) {
+                targetSlot = entryStartSlot;
+            }
+        }
+
+        const slotKey = `${activeSlot.day}-${targetSlot}`;
 
         // Use functional update to ensure we always read the latest state
         setSelectedSlots(prevSlots => {
@@ -502,6 +553,38 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const getSelectedEntries = (dayIndex: number, slotIndex: number): AvailableClassEntry[] => {
         const key = `${dayIndex}-${slotIndex}`;
         return selectedSlots.get(key) || [];
+    };
+
+    // Calculate span for a given entry
+    const getSpanInfo = (entry: AvailableClassEntry, defaultStartSlot?: number) => {
+        let startSlot = -1;
+        let endSlot = -1;
+        TIME_SLOTS.forEach((_, i) => {
+            const slotStart = getMinutes(TIME_SLOTS[i].start);
+            const slotEnd = getMinutes(TIME_SLOTS[i].end);
+            const entryStart = getMinutes(entry.start_time);
+            const entryEnd = getMinutes(entry.end_time);
+            if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
+                if (startSlot === -1) startSlot = i;
+                endSlot = i;
+            }
+        });
+        if (startSlot === -1) return { startSlot: defaultStartSlot ?? 0, span: 1 };
+        return { startSlot, span: endSlot - startSlot + 1 };
+    };
+
+    // Check if a cell is covered by an absolute card from a previous slot
+    const isSlotCovered = (dayIndex: number, slotIndex: number): boolean => {
+        for (let prevSlot = 0; prevSlot < slotIndex; prevSlot++) {
+            const prevEntries = getSelectedEntries(dayIndex, prevSlot);
+            for (const entry of prevEntries) {
+                const { startSlot, span } = getSpanInfo(entry, prevSlot);
+                if (startSlot + span > slotIndex) {
+                    return true;
+                }
+            }
+        }
+        return false;
     };
 
     const normalizedSearch = classTypeSearch.trim().toLowerCase();
@@ -689,47 +772,81 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
                                 const hasSelection = selectedEntries.length > 0;
                                 const isSearchMatch = highlightedSlotKeys.has(cellKey);
+                                const isCovered = isSlotCovered(dayIndex, slotIndex);
 
                                 // Render helper for a half-slot card
-                                const renderCard = (entry: AvailableClassEntry, position: 'top' | 'bottom' | 'single') => (
-                                    <div
-                                        key={entry.id}
-                                        className={`half-slot-card-wrapper slot-${position}`}
-                                        style={{
-                                            flex: 1,
-                                            width: '100%',
-                                            position: 'relative',
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSlotClick(dayIndex, slotIndex, entry.week_type === 'all' ? 'full' : entry.week_type as 'odd' | 'even');
-                                        }}
-                                    >
-                                        <ClassCard
-                                            data={{
-                                                id: entry.id,
-                                                subjectName: entry.subject_name || 'Ismeretlen tárgy',
-                                                teacherName: entry.teacher_name || '',
-                                                classroom: entry.classroom || '',
-                                                className: entry.class_name,
+                                const renderCard = (entry: AvailableClassEntry, position: 'top' | 'bottom' | 'single') => {
+                                    const { startSlot, span } = getSpanInfo(entry, slotIndex);
+
+                                    // Deduplicate rendering: Only render if this slot is the actual start slot
+                                    if (slotIndex !== startSlot) {
+                                        // Render an invisible spacer so flex layout stays intact for the OTHER half
+                                        return <div key={`${entry.id}-spacer`} style={{ flex: 1, visibility: 'hidden' }} />;
+                                    }
+
+                                    const isEntryActive = activeSlot &&
+                                        activeSlot.day === dayIndex &&
+                                        activeSlot.slot >= startSlot &&
+                                        activeSlot.slot < startSlot + span;
+
+                                    const isAbsolute = span > 1;
+                                    let heightStr = undefined;
+                                    if (isAbsolute) {
+                                        // A cell comprises exactly 86px height based on index.css (.planner-slot-cell height: 86px)
+                                        // The planner grid gap is 4px.
+                                        const CELL_HEIGHT = 86;
+                                        const GAP = 4;
+
+                                        heightStr = position === 'single'
+                                            ? `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`
+                                            : `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`; // Even half-slots consume the full vertical space of their respective grid rows over the span
+                                    }
+
+                                    return (
+                                        <div
+                                            key={entry.id}
+                                            className={`half-slot-card-wrapper slot-${position} ${isEntryActive ? 'active' : ''}`}
+                                            style={{
+                                                flex: isAbsolute ? undefined : 1,
+                                                width: '100%',
+                                                position: isAbsolute ? 'absolute' : 'relative',
+                                                top: isAbsolute ? (position === 'bottom' ? '50%' : 0) : undefined,
+                                                left: 0,
+                                                right: 0,
+                                                zIndex: isAbsolute ? 20 : 1,
+                                                height: heightStr,
                                             }}
-                                            showTeacher={entry.week_type === 'all'}
-                                            showRoom={entry.week_type === 'all'}
-                                            showClassName={entry.class_id !== selectedClass?.id}
-                                            variant="compact"
-                                        />
-                                        <button
-                                            className="half-slot-delete-btn"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                deleteEntry(dayIndex, slotIndex, entry.id);
+                                                handleSlotClick(dayIndex, startSlot, entry.week_type === 'all' ? 'full' : entry.week_type as 'odd' | 'even');
                                             }}
-                                            title="Törlés"
                                         >
-                                            ×
-                                        </button>
-                                    </div>
-                                );
+                                            <ClassCard
+                                                data={{
+                                                    id: entry.id,
+                                                    subjectName: entry.subject_name || 'Ismeretlen tárgy',
+                                                    teacherName: entry.teacher_name || '',
+                                                    classroom: entry.classroom || '',
+                                                    className: entry.class_name,
+                                                }}
+                                                showTeacher={entry.week_type === 'all' || span > 1}
+                                                showRoom={entry.week_type === 'all' || span > 1}
+                                                showClassName={entry.class_id !== selectedClass?.id}
+                                                variant="compact"
+                                            />
+                                            <button
+                                                className="half-slot-delete-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteEntry(dayIndex, startSlot, entry.id);
+                                                }}
+                                                title="Törlés"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    );
+                                };
 
                                 // Render helper for empty half plus button
                                 const renderPlusButton = (half: 'odd' | 'even') => (
@@ -750,19 +867,20 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                         ref={(el) => {
                                             if (el) cellRefs.current.set(cellKey, el);
                                         }}
-                                        className={`planner-slot-cell ${isActive ? 'active' : ''} ${hasOptions || hasSelection ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
+                                        className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
                                         style={{
-                                            background: hasSelection ? 'transparent' : 'var(--bg-secondary)',
-                                            borderColor: isActive
+                                            background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
+                                            borderColor: isActive && !hasSelection && !isCovered
                                                 ? 'var(--accent)'
                                                 : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
                                             opacity: activeSlot && !isActive ? 0.4 : 1,
                                             display: 'flex',
                                             flexDirection: 'column',
                                             gap: 0,
+                                            pointerEvents: isCovered ? 'none' : 'auto',
                                         }}
                                         onClick={() => {
-                                            if (!hasSelection && hasOptions) {
+                                            if (!hasSelection && hasOptions && !isCovered) {
                                                 handleSlotClick(dayIndex, slotIndex, 'full');
                                             }
                                         }}
@@ -771,15 +889,17 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             renderCard(fullEntry, 'single')
                                         ) : !oddEntry && !evenEntry ? (
                                             // Completely empty slot with options
-                                            <div
-                                                className="empty-slot-plus"
-                                                style={{ flex: 1 }}
-                                                onClick={(e) => {
-                                                    if (hasOptions) handleSlotClick(dayIndex, slotIndex, 'full');
-                                                }}
-                                            >
-                                                {hasOptions && <span>+</span>}
-                                            </div>
+                                            !isCovered && (
+                                                <div
+                                                    className="empty-slot-plus"
+                                                    style={{ flex: 1 }}
+                                                    onClick={(e) => {
+                                                        if (hasOptions) handleSlotClick(dayIndex, slotIndex, 'full');
+                                                    }}
+                                                >
+                                                    {hasOptions && <span>+</span>}
+                                                </div>
+                                            )
                                         ) : (
                                             <>
                                                 {oddEntry ? (
