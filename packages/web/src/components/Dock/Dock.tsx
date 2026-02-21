@@ -10,10 +10,12 @@ import React, { Children, cloneElement, useEffect, useState } from 'react';
 
 import './Dock.css';
 
-export type DockItemData = {
+export interface DockItemData {
     icon: React.ReactNode;
-    label: React.ReactNode;
+    label: string;
     onClick: () => void;
+    active?: boolean;
+    variant?: 'toggle' | 'link';
     className?: string;
 };
 
@@ -128,7 +130,7 @@ export default function Dock({
                 {children && <div className="dock-content">{children}</div>}
 
                 {items.map((item, index) => (
-                    <DockItem key={`dock-item-${index}`} className={item.className} onClick={item.onClick} size={itemSize}>
+                    <DockItem key={`dock-item-${index}`} className={`${item.active ? 'active' : ''} ${item.className || ''}`} onClick={item.onClick} size={itemSize}>
                         <DockIcon>{item.icon}</DockIcon>
                         <DockLabel>{item.label}</DockLabel>
                     </DockItem>

@@ -8,17 +8,19 @@ import Settings from './components/Settings';
 import BackgroundSelector from './components/backgrounds/BackgroundSelector';
 import Welcome from './components/Welcome';
 import Dock, { type DockItemData } from './components/Dock';
+import MobileMenu from './components/MobileMenu';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import { formatClassName } from './utils/format';
 import type { BackgroundTheme } from '@shared/lib/types';
-import { setSubjectPalette } from '@shared/index';
+import { setSubjectPalette, DEFAULT_SUBJECT_COLORS } from '@shared/index';
 import './index.css';
 
 type Tab = 'timetable' | 'planner' | 'settings';
 
 // Theme list for cycling
 const BACKGROUND_THEMES: BackgroundTheme[] = [
-  'none', 'silk', 'aurora', 'pixel-blast',
-  'iridescence', 'liquid-chrome', 'sapientia', 'faulty-terminal'
+  'none', 'sapientia', 'silk', 'aurora', 'pixel-blast',
+  'beams', 'dither', 'iridescence', 'liquid-chrome', 'faulty-terminal'
 ];
 
 // Clean SVG icons
@@ -70,28 +72,15 @@ const SaveIcon = () => (
   </svg>
 );
 
-const SAPIENTIA_COLORS = [
-  '#C66952', '#789179', '#968DCA', '#7CA094', '#59777C',
-  '#B08D4B', '#37452B', '#8996DE', '#C66F76'
-];
-
 function App() {
   const { initialize, isLoading, preferences, updatePreferences, selectedClass, isFirstLaunch, isFaultyTerminalUnlocked } = useAppStore();
-
-  // Update color palette based on theme
-  useEffect(() => {
-    if (preferences.backgroundTheme === 'sapientia') {
-      setSubjectPalette(SAPIENTIA_COLORS);
-    } else {
-      setSubjectPalette(null);
-    }
-  }, [preferences.backgroundTheme]);
-
   const [activeTab, setActiveTab] = useState<Tab>('timetable');
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
   const [includeCrossMajor, setIncludeCrossMajor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const plannerSaveRef = useRef<(() => void) | null>(null);
 
   // Initialize store on mount
@@ -119,9 +108,31 @@ function App() {
     }
   };
 
-  // Sync theme to body dataset
+  // Sync theme to body dataset and update color palette
   useEffect(() => {
     document.body.dataset.theme = preferences.backgroundTheme;
+
+    // Apply Sapientia specific class colors
+    if (preferences.backgroundTheme === 'sapientia') {
+      const sapientiaPalette = [
+        '#719EB5', // Muted Blue
+        '#7CA193', // Sage Green
+        '#C66953', // Terracotta Red
+        '#968DCA', // Soft Purple
+        '#E99F79', // Peach Orange
+        '#89B4B4', // Dusty Teal
+        '#C48696', // Dusty Rose
+        '#D0A55D', // Muted Gold
+        '#92A374', // Faded Olive
+        '#7D8DAB', // Dusty Indigo
+        '#B49082', // Warm Taupe
+        '#8FA4C2', // Periwinkle
+      ];
+      setSubjectPalette(sapientiaPalette);
+    } else {
+      setSubjectPalette(null); // Reset to default vibrant palette
+    }
+
   }, [preferences.backgroundTheme]);
 
   if (isLoading) {
@@ -145,25 +156,26 @@ function App() {
       icon: <CalendarIcon />,
       label: 'Órarend',
       onClick: () => setActiveTab('timetable'),
-      className: activeTab === 'timetable' ? 'active' : '',
+      active: activeTab === 'timetable',
     },
     {
       icon: <EditIcon />,
       label: 'Tervező',
       onClick: () => setActiveTab('planner'),
-      className: activeTab === 'planner' ? 'active' : '',
+      active: activeTab === 'planner',
     },
     {
       icon: <SettingsIcon />,
       label: 'Beállítások',
       onClick: () => setActiveTab('settings'),
-      className: activeTab === 'settings' ? 'active' : '',
+      active: activeTab === 'settings',
     },
     {
       icon: <ClockIcon />,
-      label: preferences.showTimeIndicator ? 'Idő jelző ki' : 'Idő jelző be',
+      label: 'Idő jelző',
       onClick: () => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator }),
-      className: preferences.showTimeIndicator ? 'active' : '',
+      active: preferences.showTimeIndicator,
+      variant: 'toggle',
     },
     {
       icon: <PaletteIcon />,
@@ -204,60 +216,93 @@ function App() {
           )}
         </div>
 
-        <Dock items={dockItems} itemSize={42}>
-          {activeTab === 'planner' && (
-            <>
-              <input
-                type="text"
-                value={plannerSearchQuery}
-                onChange={(e) => setPlannerSearchQuery(e.target.value)}
-                placeholder="Típus keresés..."
-                style={{
-                  minWidth: '140px',
-                  maxWidth: '200px',
-                  width: '14vw',
-                  padding: '8px 12px',
+        {isMobile ? (
+          <button
+            className="burger-btn"
+            onClick={() => setIsMobileMenuOpen(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-primary)',
+              padding: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        ) : (
+          <Dock items={dockItems} itemSize={42}>
+            {activeTab === 'planner' && (
+              <>
+                <input
+                  type="text"
+                  value={plannerSearchQuery}
+                  onChange={(e) => setPlannerSearchQuery(e.target.value)}
+                  placeholder="Típus keresés..."
+                  style={{
+                    minWidth: '140px',
+                    maxWidth: '200px',
+                    width: '14vw',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(26, 26, 36, 0.6)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    height: '42px', // Match Dock item size
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  background: 'rgba(26, 26, 36, 0.6)',
+                  padding: '0 12px',
                   borderRadius: '10px',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(26, 26, 36, 0.6)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  outline: 'none',
                   height: '42px', // Match Dock item size
+                  transition: 'all 0.2s ease',
                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                 }}
-              />
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.8rem',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                userSelect: 'none',
-                background: 'rgba(26, 26, 36, 0.6)',
-                padding: '0 12px',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                height: '42px', // Match Dock item size
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(40, 40, 50, 0.8)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(26, 26, 36, 0.6)'}
-              >
-                <input
-                  type="checkbox"
-                  checked={includeCrossMajor}
-                  onChange={(e) => setIncludeCrossMajor(e.target.checked)}
-                  style={{ accentColor: 'var(--accent)', width: '14px', height: '14px' }}
-                />
-                <span style={{ whiteSpace: 'nowrap' }}>Bővített</span>
-              </label>
-            </>
-          )}
-        </Dock>
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(40, 40, 50, 0.8)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(26, 26, 36, 0.6)'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeCrossMajor}
+                    onChange={(e) => setIncludeCrossMajor(e.target.checked)}
+                    style={{ accentColor: 'var(--accent)', width: '14px', height: '14px' }}
+                  />
+                  <span style={{ whiteSpace: 'nowrap' }}>Bővített</span>
+                </label>
+              </>
+            )}
+          </Dock>
+        )}
       </header>
+
+      {/* Mobile Menu */}
+      <MobileMenu
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        items={dockItems.map(item => ({
+          ...item,
+          isActive: item.active
+        }))}
+      />
 
       {/* Content */}
       <main className="app-content">
@@ -275,7 +320,7 @@ function App() {
         )}
         {activeTab === 'settings' && <Settings />}
       </main>
-    </div>
+    </div >
   );
 }
 
