@@ -7,9 +7,7 @@ import type { ClassData, BackgroundTheme } from '@shared/lib/types';
 
 const BACKGROUND_THEMES: { id: BackgroundTheme; label: string; icon: string }[] = [
     { id: 'none', label: 'Sötét', icon: '🌑' },
-    { id: 'silk', label: 'Silk', icon: '🧵' },
     { id: 'aurora', label: 'Aurora', icon: '🌌' },
-
     { id: 'pixel-blast', label: 'Pixel Blast', icon: '👾' },
     { id: 'iridescence', label: 'Iridescence', icon: '🌈' },
     { id: 'liquid-chrome', label: 'Liquid Chrome', icon: '💎' },
@@ -116,6 +114,61 @@ export default function Settings() {
         if (confirm(`Biztosan törlöd a "${subject}" tárgyat az importáltak közül?`)) {
             await removeImportedSubject(subject);
         }
+    };
+
+    // --- Export / Import Backup ---
+    const handleExport = () => {
+        const state = useAppStore.getState();
+        const exportData = {
+            selectedClass: state.selectedClass,
+            timetableEntries: state.timetableEntries,
+            userSelections: state.userSelections,
+            preferences: state.preferences,
+            importedSubjects: state.importedSubjects,
+            isFaultyTerminalUnlocked: state.isFaultyTerminalUnlocked
+        };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `unitimetable-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = JSON.parse(e.target?.result as string);
+
+                if (data && typeof data === 'object') {
+                    const store = useAppStore.getState();
+
+                    if (data.selectedClass !== undefined) await store.setSelectedClass(data.selectedClass);
+                    if (data.timetableEntries !== undefined) store.setTimetableEntries(data.timetableEntries);
+                    if (data.userSelections !== undefined) await store.setSelections(data.userSelections);
+                    if (data.preferences !== undefined) await store.updatePreferences(data.preferences);
+                    if (data.importedSubjects !== undefined) await store.setImportedSubjects(data.importedSubjects);
+                    if (data.isFaultyTerminalUnlocked !== undefined) await store.setFaultyTerminalUnlocked(data.isFaultyTerminalUnlocked);
+
+                    await store.initialize();
+                    alert('Sikeres adatvisszaállítás!');
+                } else {
+                    alert('Érvénytelen fájlformátum.');
+                }
+            } catch (error) {
+                console.error('Import failed:', error);
+                alert('Hiba történt az importálás során. Hibás JSON formátum.');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset input so the same file can be selected again
     };
 
     // Easter Egg Logic
@@ -229,9 +282,12 @@ export default function Settings() {
                         className="settings-row"
                         onClick={() => updatePreferences({ invertWeekParity: !preferences.invertWeekParity })}
                     >
-                        <div className="settings-label">
+                        <div className="settings-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <span>🔄</span>
-                            <span>Páros/Páratlan hét cseréje</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span>Páros/Páratlan hét megfordítása</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'normal', marginTop: '2px' }}>Eltérés a hivatalos akadémiai naptártól</span>
+                            </div>
                         </div>
                         <div className={`toggle ${preferences.invertWeekParity ? 'active' : ''}`}>
                             {preferences.invertWeekParity ? '✓' : ''}
@@ -455,7 +511,6 @@ export default function Settings() {
                         </div>
                     )}
 
-                    {/* Reset App */}
                     <div
                         className="settings-row clickable"
                         style={{ borderTop: '1px solid var(--border)' }}
@@ -473,6 +528,46 @@ export default function Settings() {
                         <div className="settings-value">
                             <span>›</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Backup & Restore */}
+            <div className="settings-section">
+                <h2>Adatmentés</h2>
+                <div className="settings-card glass-card">
+                    <div
+                        className="settings-row clickable"
+                        onClick={handleExport}
+                    >
+                        <div className="settings-label">
+                            <span>💾</span>
+                            <span>Mentés exportálása fájlba</span>
+                        </div>
+                        <div className="settings-value">
+                            <span>›</span>
+                        </div>
+                    </div>
+
+                    <div
+                        className="settings-row clickable"
+                        style={{ borderTop: '1px solid var(--border)' }}
+                        onClick={() => document.getElementById('import-file-upload')?.click()}
+                    >
+                        <div className="settings-label">
+                            <span>📂</span>
+                            <span>Mentés importálása fájlból</span>
+                        </div>
+                        <div className="settings-value">
+                            <span>›</span>
+                        </div>
+                        <input
+                            id="import-file-upload"
+                            type="file"
+                            accept=".json"
+                            style={{ display: 'none' }}
+                            onChange={handleImport}
+                        />
                     </div>
                 </div>
             </div>

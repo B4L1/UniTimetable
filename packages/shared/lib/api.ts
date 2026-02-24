@@ -8,6 +8,7 @@ export type { ClassData, TimetableEntry };
 
 export interface AvailableClassEntry extends TimetableEntry {
     class_name?: string;
+    shared_classes?: string[];
 }
 
 /**
@@ -105,6 +106,7 @@ export async function fetchAvailableClassesForPlanner(classId: string, importSub
 
         // Strategy 2: Imported Subjects (Specific User Selections)
         if (importSubjects.length > 0) {
+            // Fetch ALL entries for the imported subjects, regardless of faculty/year
             const { data: importedEntries } = await supabase
                 .from('timetable_entries')
                 .select('*')
@@ -124,9 +126,8 @@ export async function fetchAvailableClassesForPlanner(classId: string, importSub
             }
         }
 
-        // Strategy 3: Legacy Cross-Major Search (Optional, might be removed later if 'Extended Search' toggle is removed)
+        // Strategy 3: Legacy Cross-Major Search (Extended Search Toggle)
         if (includeCrossMajor) {
-            // ... (Keep existing logic or simplify if no longer needed. Let's keep for backward compat for now)
             // A. Get subjects of cohort
             const { data: subjectData } = await supabase
                 .from('timetable_entries')
@@ -136,25 +137,30 @@ export async function fetchAvailableClassesForPlanner(classId: string, importSub
             if (subjectData) {
                 const uniqueSubjects = Array.from(new Set(subjectData.map(s => s.subject_name)));
 
-                // B. Fetch all entries with these subjects
-                const { data: allEntries } = await supabase
-                    .from('timetable_entries')
-                    .select('*')
-                    .in('subject_name', uniqueSubjects)
-                    .order('day_of_week')
-                    .order('start_time');
+                // Exclude subjects that were already handled by importSubjects to avoid redundant fetching
+                const subjectsToFetch = uniqueSubjects.filter(s => !importSubjects.includes(s));
 
-                if (allEntries) {
-                    const existingIds = new Set(entries.map(e => e.id));
-                    allEntries.forEach(ae => {
-                        if (!existingIds.has(ae.id)) {
-                            entries.push(ae);
-                            existingIds.add(ae.id);
-                        }
-                    });
+                if (subjectsToFetch.length > 0) {
+                    // B. Fetch all entries with these subjects
+                    const { data: allEntries } = await supabase
+                        .from('timetable_entries')
+                        .select('*')
+                        .in('subject_name', subjectsToFetch)
+                        .order('day_of_week')
+                        .order('start_time');
+
+                    if (allEntries) {
+                        const existingIds = new Set(entries.map(e => e.id));
+                        allEntries.forEach(ae => {
+                            if (!existingIds.has(ae.id)) {
+                                entries.push(ae);
+                                existingIds.add(ae.id);
+                            }
+                        });
+                    }
                 }
             }
-        }
+        } // Added missing closing brace for if (includeCrossMajor)
 
         // 4. Enrich with class names
         // Note: For cross-major/imports, we might encounter class_ids NOT in siblingClasses.

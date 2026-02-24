@@ -225,15 +225,53 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     // Deduplication logic
                     let isDuplicate = false;
 
-                    if (includeCrossMajor) {
-                        // In extended mode, we show duplicates unless they are exact matches (same subject, class, teacher, room)
-                        // This allows seeing the SAME subject taught to DIFFERENT groups or by DIFFERENT teachers
-                        isDuplicate = existing.some(e =>
+                    if (includeCrossMajor || importedSubjects.includes(entry.subject_name)) {
+                        // In extended mode (or for imported subjects), we deduplicate classes that are physically the same lecture
+                        // (same subject, time, teacher, room) even if they are assigned to different class groups
+                        const duplicateIndex = existing.findIndex(e =>
                             e.subject_name === entry.subject_name &&
-                            e.class_id === entry.class_id &&
+                            e.start_time === entry.start_time &&
+                            e.end_time === entry.end_time &&
+                            e.week_type === entry.week_type &&
                             e.teacher_name === entry.teacher_name &&
                             e.classroom === entry.classroom
                         );
+
+                        if (duplicateIndex !== -1) {
+                            isDuplicate = true;
+                            const dup = existing[duplicateIndex];
+
+                            // Initialize shared tracking if not present
+                            if (!dup.shared_classes) {
+                                dup.shared_classes = [dup.class_name || 'Ismeretlen csoport'];
+                            }
+
+                            // Add new class name to shared list
+                            const newClassName = entry.class_name || 'Ismeretlen csoport';
+                            if (!dup.shared_classes.includes(newClassName)) {
+                                dup.shared_classes.push(newClassName);
+
+                                // Prioritize class_name by similarity to user's class (selectedClass.name)
+                                const getSimilarity = (name: string) => {
+                                    if (!selectedClass?.name) return 0;
+                                    const targetWords = name.toLowerCase().split(/[ .\-]/).filter(Boolean);
+                                    const userWords = selectedClass.name.toLowerCase().split(/[ .\-]/).filter(Boolean);
+                                    let score = 0;
+                                    targetWords.forEach(w => {
+                                        if (userWords.includes(w)) score++;
+                                    });
+                                    return score;
+                                };
+
+                                const currentScore = getSimilarity(dup.class_name || '');
+                                const newScore = getSimilarity(newClassName);
+
+                                // If the new class name is more similar to the user's major/year, make it the primary label
+                                if (newScore > currentScore || (newScore === currentScore && newClassName.length < (dup.class_name || '').length)) {
+                                    dup.class_name = newClassName;
+                                }
+                            }
+                        }
                     } else {
                         // Standard mode: Aggressive deduplication by subject name to keep the view clean
                         isDuplicate = existing.some(e => e.subject_name === entry.subject_name);
@@ -714,7 +752,10 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     }}
                     title="Törlés"
                 >
-                    ×
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
         );
@@ -762,7 +803,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     let dropdownOptions: (AvailableClassEntry | { id: string; isDivider: true })[] = [];
 
     if (activeSlot && activeHalf) {
-        const rawOptions = getAllOptions();
+        // Filter out classes that are ALREADY selected in this exact cell
+        // to prevent the dropdown from showing an identical class below the active cell
+        const currentSelections = getSelectedEntries(activeSlot.day, activeSlot.slot);
+        const currentIds = new Set(currentSelections.map(s => s.id));
+        const rawOptions = getAllOptions().filter(o => !currentIds.has(o.id));
 
         if (activeHalf === 'full') {
             // Empty slot or clicking whole slot - show all options
@@ -892,6 +937,67 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     {isMobile ? (
                         // Mobile Carousel (Single Day at a time)
                         <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
+                            {/* Static Controls (Search & Toggle) - Placed at the bottom */}
+                            <div className="mobile-planner-controls glass-card" style={{
+                                position: 'absolute',
+                                bottom: '32px',
+                                top: 'auto',
+                                left: '0',
+                                right: '0',
+                                zIndex: 10,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                padding: '8px 12px',
+                                gap: '8px',
+                                borderRadius: '12px',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border)',
+                            }}>
+                                <span style={{
+                                    fontSize: '0.7rem',
+                                    color: 'var(--text-secondary)',
+                                    opacity: 0.8,
+                                    textAlign: 'center'
+                                }}>
+                                    💡 A tervező használata számítógépen kényelmesebb
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Keresés..."
+                                        value={classTypeSearch}
+                                        onChange={(e) => onClassTypeSearchChange?.(e.target.value)}
+                                        style={{
+                                            flex: 1,
+                                            padding: '6px 12px',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border)',
+                                            background: 'var(--bg-secondary)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '0.8rem',
+                                            minWidth: 0,
+                                        }}
+                                    />
+                                    <label style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '0.8rem',
+                                        color: 'var(--text-primary)',
+                                        fontWeight: 500,
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={includeCrossMajor}
+                                            onChange={(e) => onIncludeCrossMajorChange(e.target.checked)}
+                                            style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                                        />
+                                        Bővített
+                                    </label>
+                                </div>
+                            </div>
                             <AnimatePresence initial={false} custom={direction} mode="popLayout">
                                 <motion.div
                                     key={currentDayIndex}
@@ -929,7 +1035,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                         <div className="planner-column-header">
                                             {DAYS[currentDayIndex]} {currentDayIndex === today && '(Ma)'}
                                         </div>
-                                        <div className="planner-slots-stack">
+                                        <div className="planner-slots-stack" style={{ paddingBottom: '80px' }}>
                                             {TIME_SLOTS.map((slot, slotIndex) => {
                                                 const cellKey = `${currentDayIndex}-${slotIndex}`;
                                                 const selectedEntries = getSelectedEntries(currentDayIndex, slotIndex);
@@ -957,7 +1063,6 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                                 borderColor: isActive && !hasSelection && !isCovered
                                                                     ? 'var(--accent)'
                                                                     : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
-                                                                opacity: activeSlot && !isActive ? 0.4 : 1,
                                                                 display: 'flex',
                                                                 flexDirection: 'column',
                                                                 gap: 0,
@@ -1012,7 +1117,6 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                 borderColor: isActive && !hasSelection && !isCovered
                                                     ? 'var(--accent)'
                                                     : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
-                                                opacity: activeSlot && !isActive ? 0.4 : 1,
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 gap: 0,
@@ -1071,21 +1175,35 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                         }
                                         const entry = item as AvailableClassEntry;
                                         return (
-                                            <ClassCard
-                                                key={entry.id}
-                                                data={{
-                                                    id: entry.id,
-                                                    subjectName: entry.subject_name,
-                                                    teacherName: entry.teacher_name,
-                                                    classroom: entry.classroom,
-                                                    className: entry.class_name,
-                                                }}
-                                                showTeacher={true}
-                                                showRoom={true}
-                                                showClassName={true}
-                                                variant="dropdown"
-                                                enableGlare={true}
-                                            />
+                                            <div key={entry.id} style={{ position: 'relative' }}>
+                                                <ClassCard
+                                                    data={{
+                                                        id: entry.id,
+                                                        subjectName: entry.subject_name || 'Ismeretlen tárgy',
+                                                        teacherName: entry.teacher_name || '',
+                                                        classroom: entry.classroom || '',
+                                                        className: entry.class_name,
+                                                        weekType: entry.week_type as 'all' | 'odd' | 'even',
+                                                    }}
+                                                    showTeacher={true}
+                                                    showRoom={true}
+                                                    showClassName={true}
+                                                    variant="dropdown"
+                                                    enableGlare={true}
+                                                />
+                                                {entry.shared_classes && entry.shared_classes.length > 1 && (
+                                                    <button
+                                                        className="shared-groups-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            alert(`Ez az óra közös a következő csoportokkal:\n\n${entry.shared_classes!.join('\n')}`);
+                                                        }}
+                                                        title={`Közös óra ${entry.shared_classes.length} csoporttal`}
+                                                    >
+                                                        ℹ️ +{entry.shared_classes.length - 1}
+                                                    </button>
+                                                )}
+                                            </div>
                                         );
                                     }),
                                     ...(activeSlot && getSelectedEntries(activeSlot.day, activeSlot.slot).length > 0 ? [

@@ -30,16 +30,17 @@ async function checkDatabase() {
                 subject_name,
                 class_id,
                 start_time,
+                end_time,
                 day_of_week
             `)
-            .limit(5);
+            .limit(10);
 
         if (sampleError) {
             console.error('❌ Error fetching sample entries:', sampleError.message);
         } else {
             console.log('Sample entries:');
             entries.forEach(e => {
-                console.log(`- ${e.subject_name} (ClassID: ${e.class_id}, Day: ${e.day_of_week})`);
+                console.log(`- ${e.subject_name} (Day: ${e.day_of_week}, ${e.start_time} - ${e.end_time})`);
             });
         }
     } else {

@@ -206,13 +206,18 @@ body[data-theme='faulty-terminal'] * {
 /* Timetable Grid */
 .timetable-container {
   padding: 16px 24px;
-  overflow-x: auto;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .timetable-grid {
   display: grid;
   gap: 2px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .time-column {
@@ -249,6 +254,7 @@ body[data-theme='faulty-terminal'] * {
   flex-direction: column;
   justify-content: center;
   border-radius: 12px;
+  min-height: 0;
 }
 
 .time-label {
@@ -265,8 +271,8 @@ body[data-theme='faulty-terminal'] * {
   position: relative;
   border-radius: 12px;
   padding: 0;
-  min-height: 86px;
-  /* Match planner height */
+  min-height: 0;
+  /* min-height removed so it conforms to the grid's fractional rows */
 }
 
 /* Base time marker style - using local var for color */
@@ -286,7 +292,6 @@ body[data-theme='faulty-terminal'] * {
   /* Higher z-index to be above grid */
   pointer-events: none;
   box-shadow: 0 0 8px var(--time-line-glow);
-  transition: top 0.3s ease-in-out;
 }
 
 
@@ -321,9 +326,11 @@ body[data-theme='faulty-terminal'] * {
   .mobile-timetable-grid {
     display: grid;
     grid-template-columns: 60px minmax(0, 1fr);
+    /* grid-template-rows will be set via inline styles dynamically */
     gap: 4px;
     position: relative;
     width: 100%;
+    height: 100%;
     box-sizing: border-box;
   }
 
@@ -333,7 +340,7 @@ body[data-theme='faulty-terminal'] * {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 86px;
+    min-height: 0;
     font-size: 0.7rem;
   }
 
@@ -585,6 +592,17 @@ select:focus {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.welcome-import-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+.welcome-import-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .spinner-container {

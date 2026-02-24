@@ -1,0 +1,32 @@
+[
+  {
+    "subject_name": "Komputacionális geometria e.a.",
+    "start_time": "10:00:00",
+    "end_time": "11:50:00",
+    "day_of_week": 0
+  },
+  {
+    "subject_name": "Objektumelvu programozás e.a.",
+    "start_time": "08:00:00",
+    "end_time": "09:50:00",
+    "day_of_week": 0
+  },
+  {
+    "subject_name": "Komputacionális geometria szem.",
+    "start_time": "12:30:00",
+    "end_time": "14:20:00",
+    "day_of_week": 0
+  },
+  {
+    "subject_name": "Német nyelv II.",
+    "start_time": "16:30:00",
+    "end_time": "18:20:00",
+    "day_of_week": 0
+  },
+  {
+    "subject_name": "Objektumelvu programozás gyak.",
+    "start_time": "08:00:00",
+    "end_time": "09:50:00",
+    "day_of_week": 1
+  }
+]

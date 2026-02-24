@@ -30,6 +30,7 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    touch-action: pan-y;
     /* Allow scrolling if content is too long */
     scrollbar-width: none;
     /* Hide scrollbar Firefox */
@@ -40,6 +41,12 @@
 .class-card-content::-webkit-scrollbar {
     display: none;
     /* Hide scrollbar Chrome/Safari/Brave */
+}
+
+/* Prevent mobile swiping issues from overflow-y */
+.class-card--compact .class-card-content {
+    overflow-y: hidden;
+    touch-action: pan-y;
 }
 
 /* Subject */
@@ -144,4 +151,33 @@
 
 .class-card--dropdown .class-card-subject {
     margin-bottom: 6px;
+}
+
+/* ============================================ */
+/* Week Type Visual Indicators */
+/* ============================================ */
+.class-card.is-odd-week::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(-45deg, rgba(30, 30, 42, 0.95) 50%, transparent 50.1%);
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.class-card.is-even-week::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(-45deg, transparent 49.9%, rgba(30, 30, 42, 0.95) 50%);
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
 }

@@ -51,7 +51,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     theme: 'dark',
     language: 'hu',
     showTimeIndicator: true,
-    backgroundTheme: 'aurora',
+    backgroundTheme: 'sapientia',
     invertWeekParity: false,
 };
 

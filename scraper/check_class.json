@@ -1,0 +1,54 @@
+[
+  {
+    "entry": {
+      "subject_name": "Osztott rendszerek e.a.",
+      "start_time": "08:00:00",
+      "end_time": "08:50:00",
+      "day_of_week": 4,
+      "class_id": "8d7c22b3-1a11-4f8c-8013-26dd420327fc"
+    },
+    "class": {
+      "name": "Számítástechnika III.A. -11",
+      "edupage_id": "class-48"
+    }
+  },
+  {
+    "entry": {
+      "subject_name": "Osztott rendszerek e.a.",
+      "start_time": "08:00:00",
+      "end_time": "08:50:00",
+      "day_of_week": 4,
+      "class_id": "bb9805f3-bdc1-4791-be2e-d027b5ae66d5"
+    },
+    "class": {
+      "name": "Számítástechnika III.B. -7",
+      "edupage_id": "class-49"
+    }
+  },
+  {
+    "entry": {
+      "subject_name": "Osztott rendszerek e.a.",
+      "start_time": "08:00:00",
+      "end_time": "08:50:00",
+      "day_of_week": 4,
+      "class_id": "ff94658e-b550-4ea5-a29b-cda61a1a6dd9"
+    },
+    "class": {
+      "name": "Automatizálás IV.A.-9",
+      "edupage_id": "class-56"
+    }
+  },
+  {
+    "entry": {
+      "subject_name": "Osztott rendszerek e.a.",
+      "start_time": "08:00:00",
+      "end_time": "08:50:00",
+      "day_of_week": 4,
+      "class_id": "5687e1a3-e5b1-4632-85c9-98635c08d4cb"
+    },
+    "class": {
+      "name": "Automatizálás IV.B.-9",
+      "edupage_id": "class-57"
+    }
+  }
+]

@@ -47,8 +47,7 @@ body[data-theme='sapientia'] {
 
 /* Specific overrides for Sapientia theme */
 body[data-theme='sapientia'] .glass,
-body[data-theme='sapientia'] .glass-card,
-body[data-theme='sapientia'] .glass-header {
+body[data-theme='sapientia'] .glass-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     backdrop-filter: none;
@@ -56,6 +55,16 @@ body[data-theme='sapientia'] .glass-header {
     box-shadow: var(--shadow-sm);
     border-radius: 8px;
     /* Sharper corners for academic look */
+}
+
+body[data-theme='sapientia'] .glass-header {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: var(--shadow-sm);
+    border-radius: 0;
+    /* Flat bottom */
 }
 
 /* Header style - Clean White with Green Accent */
@@ -113,13 +122,50 @@ body[data-theme='sapientia'] .welcome-card {
     /* Emerald-200 border */
 }
 
+/* Welcome Page Overrides */
+body[data-theme='sapientia'] .welcome-card h1 {
+    background: none;
+    -webkit-text-fill-color: initial;
+    color: var(--sap-green);
+}
+
+body[data-theme='sapientia'] .start-btn {
+    background: var(--sap-green);
+    box-shadow: 0 4px 12px rgba(10, 108, 66, 0.3);
+}
+
+body[data-theme='sapientia'] .start-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    box-shadow: 0 8px 20px rgba(10, 108, 66, 0.4);
+}
+
+body[data-theme='sapientia'] .welcome-import-btn {
+    background: var(--sap-bg-alt);
+    border: 1px dashed var(--text-secondary);
+    color: var(--text-primary);
+}
+
+body[data-theme='sapientia'] .welcome-import-btn:hover {
+    background: #e2e8f0;
+    border-color: var(--sap-navy);
+}
+
 /* Class Cards in Timetable */
 body[data-theme='sapientia'] .class-card {
-    border: none !important;
+    border: 2px solid var(--subject-color) !important;
     box-shadow: var(--shadow-md) !important;
     /* Use the variable set by ClassCard.tsx inline style, but force it solid */
     background: var(--subject-color) !important;
     color: #ffffff !important;
+}
+
+/* Bi-weekly overlay overrides for Sapientia (light theme) */
+body[data-theme='sapientia'] .class-card.is-odd-week::before {
+    background: linear-gradient(-45deg, var(--sap-navy-light) 50%, transparent 50.1%);
+}
+
+body[data-theme='sapientia'] .class-card.is-even-week::before {
+    background: linear-gradient(-45deg, transparent 49.9%, var(--sap-navy-light) 50%);
 }
 
 /* Ensure text inherits white color */
@@ -216,13 +262,10 @@ body[data-theme='sapientia'] .planner-slot-cell.search-active.search-match {
     box-shadow: inset 0 0 0 2px var(--sap-green-light), 0 0 12px rgba(52, 211, 153, 0.2) !important;
 }
 
-/* Time Marker - Dark Green Gradient */
+/* Time Marker - Dark Green Override */
 body[data-theme='sapientia'] .time-marker {
-    background: linear-gradient(90deg,
-            rgba(10, 108, 66, 0) 0%,
-            rgba(10, 108, 66, 1) 15%,
-            rgba(10, 108, 66, 1) 85%,
-            rgba(10, 108, 66, 0) 100%) !important;
-    box-shadow: 0 0 8px rgba(10, 108, 66, 0.4) !important;
-    height: 2px !important;
+    --time-line-color: #0A6C42;
+    --time-line-glow: rgba(10, 108, 66, 0.4);
+    height: 3px !important;
+    /* Slightly thicker for visibility on light theme */
 }

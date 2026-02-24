@@ -180,6 +180,7 @@ async function extractTimetable(page, classInfo) {
             const x = parseFloat(rect.getAttribute('x') || '0');
             const y = parseFloat(rect.getAttribute('y') || '0');
             const height = parseFloat(rect.getAttribute('height') || '306');
+            const width = parseFloat(rect.getAttribute('width') || '213.75');
 
             // Get color from style
             const style = rect.getAttribute('style') || '';
@@ -198,6 +199,7 @@ async function extractTimetable(page, classInfo) {
                 classroom,
                 x,
                 y,
+                width,
                 height,
                 color,
             });
@@ -209,8 +211,14 @@ async function extractTimetable(page, classInfo) {
     // Calculate day and time slot from coordinates
     const processedEntries = entries.map(entry => {
         const dayOfWeek = getDayFromY(entry.y);
-        const slot = getSlotFromX(entry.x);
-        const timeSlot = TIME_SLOTS[slot] || { start: '08:00', end: '09:00' };
+        const startSlot = getSlotFromX(entry.x);
+
+        // Calculate spanned slots
+        const numSlots = Math.max(1, Math.round(entry.width / 213.75));
+        const endSlot = startSlot + numSlots - 1;
+
+        const startTimeSlot = TIME_SLOTS[startSlot] || { start: '08:00', end: '09:00' };
+        const endTimeSlot = TIME_SLOTS[endSlot] || TIME_SLOTS[12] || { start: '08:00', end: '09:00' };
 
         // Determine week type based on height and position
         // Full height (306) = every week
@@ -233,8 +241,8 @@ async function extractTimetable(page, classInfo) {
             teacherName: entry.teacherName,
             classroom: entry.classroom,
             dayOfWeek,
-            startTime: timeSlot.start,
-            endTime: timeSlot.end,
+            startTime: startTimeSlot.start,
+            endTime: endTimeSlot.end,
             weekType,
             color: entry.color,
         };

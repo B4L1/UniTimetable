@@ -6,8 +6,28 @@ import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacul
 import type { ClassData } from '@shared/lib/types';
 import BackgroundSelector from './backgrounds/BackgroundSelector';
 
+const SunIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="1" x2="12" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="23" />
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <line x1="1" y1="12" x2="3" y2="12" />
+        <line x1="21" y1="12" x2="23" y2="12" />
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+);
+
+const MoonIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+);
+
 export default function Welcome() {
-    const { setSelectedClass, setFirstLaunchComplete } = useAppStore();
+    const { setSelectedClass, setFirstLaunchComplete, preferences, updatePreferences } = useAppStore();
     const [classes, setClasses] = useState<ClassData[]>([]);
     const [selectedFaculty, setSelectedFaculty] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -43,12 +63,76 @@ export default function Welcome() {
         }
     };
 
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target?.result as string);
+                if (data && typeof data === 'object') {
+                    const store = useAppStore.getState();
+                    if (data.selectedClass !== undefined) await store.setSelectedClass(data.selectedClass);
+                    if (data.timetableEntries !== undefined) store.setTimetableEntries(data.timetableEntries);
+                    if (data.userSelections !== undefined) await store.setSelections(data.userSelections);
+                    if (data.preferences !== undefined) await store.updatePreferences(data.preferences);
+                    if (data.importedSubjects !== undefined) await store.setImportedSubjects(data.importedSubjects);
+                    if (data.isFaultyTerminalUnlocked !== undefined) await store.setFaultyTerminalUnlocked(data.isFaultyTerminalUnlocked);
+
+                    await store.setFirstLaunchComplete();
+                    await store.initialize();
+                    alert('Sikeres adatvisszaállítás!');
+                } else {
+                    alert('Érvénytelen fájlformátum.');
+                }
+            } catch (error) {
+                console.error('Import failed:', error);
+                alert('Hiba történt az importálás során. Hibás JSON formátum.');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
+
+    const toggleTheme = () => {
+        const isLight = preferences.backgroundTheme === 'sapientia';
+        updatePreferences({ backgroundTheme: isLight ? 'none' : 'sapientia' });
+    };
+
     return (
-        <div className="welcome-container">
-            <BackgroundSelector theme="aurora" />
+        <div className="welcome-container" style={{ position: 'relative' }}>
+            <BackgroundSelector theme={preferences.backgroundTheme} />
+
+            <button
+                onClick={toggleTheme}
+                style={{
+                    position: 'absolute',
+                    top: '20px',
+                    right: '20px',
+                    zIndex: 10,
+                    background: 'rgba(26, 26, 36, 0.6)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '50%',
+                    width: '48px',
+                    height: '48px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-primary)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                    transition: 'all 0.2s ease'
+                }}
+            >
+                {preferences.backgroundTheme === 'sapientia' ? <SunIcon /> : <MoonIcon />}
+            </button>
 
             <div className="glass-card welcome-card">
-                <h1>👋 Üdvözöllek!</h1>
+                <h1 className="welcome-title">
+                    👋 Üdvözöllek!
+                </h1>
                 <p>Kérlek válaszd ki az osztályodat a folytatáshoz.</p>
 
                 {isLoading ? (
@@ -127,6 +211,43 @@ export default function Welcome() {
                                 >
                                     Indítás 🚀
                                 </button>
+
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    margin: '20px 0',
+                                    width: '100%',
+                                    opacity: preferences.backgroundTheme === 'sapientia' ? 1 : 0.6
+                                }}>
+                                    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
+                                    <span style={{ padding: '0 10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>VAGY</span>
+                                    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
+                                </div>
+
+                                <button
+                                    className="btn clickable welcome-import-btn"
+                                    onClick={() => document.getElementById('welcome-import-file')?.click()}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                >
+                                    <span>📂</span> Órarend importálása fájlból
+                                </button>
+                                <input
+                                    id="welcome-import-file"
+                                    type="file"
+                                    accept=".json"
+                                    style={{ display: 'none' }}
+                                    onChange={handleImport}
+                                />
                             </>
                         )}
                     </div>

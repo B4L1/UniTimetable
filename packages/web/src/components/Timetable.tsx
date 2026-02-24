@@ -21,28 +21,7 @@ const TIME_SLOTS = [
 
 const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
 
-// Get current week type (odd or even)
-// Get current week type (odd or even)
-// NOTE: This week calculation might need adjustment based on the specific university calendar
-function getCurrentWeekType(): 'odd' | 'even' {
-    const now = new Date();
-    // Get the first day of the year
-    const oneJan = new Date(now.getFullYear(), 0, 1);
-
-    // Calculate full weeks to nearest Thursday: current date + 4 - current day number
-    // Make Sunday's day number 7
-    const currentDayNum = now.getDay() || 7;
-    const oneJanDayNum = oneJan.getDay() || 7;
-
-    // Calculate number of days between now and oneJan
-    const numberOfDays = Math.floor((now.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000));
-
-    // Calculate week number
-    const result = Math.ceil((numberOfDays + oneJanDayNum) / 7);
-
-    // This usually matches ISO week numbers
-    return result % 2 !== 0 ? 'odd' : 'even';
-}
+import { getAcademicWeek } from '../utils/calendar';
 
 // Find which slot an entry belongs to
 function getSlotIndex(startTime: string): number {
@@ -84,8 +63,10 @@ export default function Timetable() {
 
     // Determine current week type based on settings or auto-calculation
     const currentWeekType = useMemo(() => {
-        const calculatedWeek = getCurrentWeekType();
-        if (preferences.invertWeekParity) {
+        const calculatedWeek = getAcademicWeek().type;
+        // If it's a break or out of term, we still might want to show *something* or handle it gracefully.
+        // For now we just return it, the filter logic might skip odd/even specific classes if it's 'break'.
+        if (preferences.invertWeekParity && (calculatedWeek === 'odd' || calculatedWeek === 'even')) {
             return calculatedWeek === 'odd' ? 'even' : 'odd';
         }
         return calculatedWeek;
@@ -210,6 +191,7 @@ export default function Timetable() {
                 <div className="timetable-grid" style={{
                     display: 'grid',
                     gridTemplateColumns: `80px repeat(${DAYS.length}, 1fr)`,
+                    gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))`,
                     gap: '4px',
                     position: 'relative'
                 }}>
@@ -336,7 +318,7 @@ export default function Timetable() {
                     })()}
 
                     {/* Time Line Overlay */}
-                    {today >= 0 && today < 5 && preferences.showTimeIndicator && (
+                    {today >= 0 && today < 5 && (
                         <div
                             style={{
                                 gridArea: `2 / ${today + 2} / 8 / ${today + 3}`,
@@ -396,7 +378,7 @@ export default function Timetable() {
                     }}
                 >
                     <div className="mobile-day-column" style={{ height: '100%' }}>
-                        <div className="mobile-timetable-grid">
+                        <div className="mobile-timetable-grid" style={{ gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))` }}>
                             {/* Header row for mobile grid */}
                             <div className="glass-card" style={{
                                 gridColumn: 1,
@@ -500,7 +482,7 @@ export default function Timetable() {
                             })()}
 
                             {/* Time Line for this day column (only if it's today) */}
-                            {currentDayIndex === today && preferences.showTimeIndicator && (
+                            {currentDayIndex === today && (
                                 <div style={{
                                     gridRow: '2 / span 6',
                                     gridColumn: 2,
@@ -532,22 +514,43 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
     };
 
     const [currentPos, setCurrentPos] = useState(getPosition());
+    const instanceKeyRef = useRef(0);
+    const prevShowRef = useRef(show);
 
     useEffect(() => {
         setCurrentPos(getPosition());
     }, [currentTime]);
 
-    if (!show) return null;
+    // Track toggles to generate a new key when toggled ON
+    // This allows the exiting animation to finish going DOWN,
+    // while the NEW line comes down from the TOP (-10%)
+    if (show && !prevShowRef.current) {
+        instanceKeyRef.current += 1;
+    }
+    prevShowRef.current = show;
 
     return (
-        <div
-            className="time-marker"
-            style={{
-                top: `${currentPos}%`,
-                opacity: 1,
-                // Transition only for smooth movement between minutes, not for mounting
-            }}
-        />
+        <AnimatePresence>
+            {show && (
+                <motion.div
+                    key={`timeline-${instanceKeyRef.current}`}
+                    className="time-marker"
+                    initial={{ top: '-10%', opacity: 0 }}
+                    animate={{ top: `${currentPos}%`, opacity: 1 }}
+                    exit={{ top: '110%', opacity: 0 }}
+                    transition={{
+                        top: { type: 'spring', stiffness: 60, damping: 15 },
+                        opacity: { duration: 0.2 }
+                    }}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        height: '2px', // Make sure this is still applied if CSS class omits something
+                    }}
+                />
+            )}
+        </AnimatePresence>
     );
 }
 

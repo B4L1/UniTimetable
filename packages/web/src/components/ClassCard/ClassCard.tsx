@@ -1,6 +1,7 @@
 // Unified ClassCard component - used throughout the app for consistent class display
 
 import { getSubjectColor } from '@shared/index';
+import { useAppStore } from '../../stores/appStore';
 import GlareHover from '../GlareHover';
 import './ClassCard.css';
 
@@ -11,6 +12,7 @@ export interface ClassCardData {
     teacherCode?: string | null;
     classroom?: string | null;
     className?: string | null;
+    weekType?: 'all' | 'odd' | 'even';
 }
 
 export interface ClassCardProps {
@@ -39,6 +41,9 @@ export default function ClassCard({
     onClick,
     className = '',
 }: ClassCardProps) {
+    // Subscribe to theme context to force re-render when colors change
+    useAppStore((state: any) => state.preferences.backgroundTheme);
+
     const subjectColor = getSubjectColor(data.subjectName);
     const teacherDisplay = data.teacherName || data.teacherCode || '';
     const roomDisplay = data.classroom?.split('-')[0] || data.classroom || '';
@@ -62,7 +67,8 @@ export default function ClassCard({
         </div>
     );
 
-    const baseClassName = `class-card class-card--${variant} ${className}`;
+    const weekClass = data.weekType === 'odd' ? 'is-odd-week' : data.weekType === 'even' ? 'is-even-week' : '';
+    const baseClassName = `class-card class-card--${variant} ${weekClass} ${className}`.trim();
 
     if (enableGlare) {
         return (
