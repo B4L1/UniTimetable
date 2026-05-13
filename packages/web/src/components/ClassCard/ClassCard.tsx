@@ -29,6 +29,8 @@ export interface ClassCardProps {
     onClick?: () => void;
     // Custom class name
     className?: string;
+    // Is this a user-customized entry?
+    isCustom?: boolean;
 }
 
 export default function ClassCard({
@@ -40,6 +42,7 @@ export default function ClassCard({
     enableGlare = false,
     onClick,
     className = '',
+    isCustom = false,
 }: ClassCardProps) {
     // Subscribe to theme context to force re-render when colors change
     useAppStore((state: any) => state.preferences.backgroundTheme);
@@ -68,14 +71,15 @@ export default function ClassCard({
     );
 
     const weekClass = data.weekType === 'odd' ? 'is-odd-week' : data.weekType === 'even' ? 'is-even-week' : '';
-    const baseClassName = `class-card class-card--${variant} ${weekClass} ${className}`.trim();
+    const customClass = isCustom ? 'is-custom' : '';
+    const baseClassName = `class-card class-card--${variant} ${weekClass} ${customClass} ${className}`.trim();
 
     if (enableGlare) {
         return (
             <GlareHover
                 background={subjectColor}
                 borderColor={`${subjectColor}80`}
-                borderRadius="8px"
+                borderRadius="var(--radius-md)"
                 glareColor="#ffffff"
                 glareOpacity={0.25}
                 glareAngle={-30}
@@ -84,7 +88,11 @@ export default function ClassCard({
                 playOnce={false}
                 className={baseClassName}
                 onClick={onClick}
-                style={{ '--subject-color': subjectColor } as React.CSSProperties}
+                style={{ 
+                    '--subject-color': subjectColor,
+                    background: subjectColor,
+                    border: `1px solid ${subjectColor}80`,
+                } as React.CSSProperties}
             >
                 {cardContent}
             </GlareHover>

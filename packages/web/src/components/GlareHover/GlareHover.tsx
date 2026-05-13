@@ -16,14 +16,14 @@ interface GlareHoverProps {
     playOnce?: boolean;
     className?: string;
     style?: React.CSSProperties;
-    onClick?: () => void;
+    onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 const GlareHover: React.FC<GlareHoverProps> = ({
     width = '100%',
     height = '100%',
     background = 'transparent',
-    borderRadius = '8px',
+    borderRadius = 'var(--radius-md)',
     borderColor = 'transparent',
     children,
     glareColor = '#ffffff',
@@ -65,7 +65,13 @@ const GlareHover: React.FC<GlareHoverProps> = ({
     return (
         <div
             className={`glare-hover ${playOnce ? 'glare-hover--play-once' : ''} ${className}`}
-            style={{ ...vars, ...style } as React.CSSProperties}
+            style={{ 
+                ...vars, 
+                ...(background && background !== 'transparent' ? { background } : {}),
+                ...(borderColor && borderColor !== 'transparent' ? { border: `1px solid ${borderColor}` } : {}),
+                ...(borderRadius ? { borderRadius } : {}),
+                ...style 
+            } as React.CSSProperties}
             onClick={onClick}
         >
             {children}

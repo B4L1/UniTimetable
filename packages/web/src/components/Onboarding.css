@@ -1,0 +1,106 @@
+.onboarding-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.onboarding-card {
+    max-width: 500px;
+    width: 100%;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.onboarding-card h1 {
+    font-size: 2rem;
+    color: var(--accent);
+    margin: 0;
+}
+
+.onboarding-intro {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    font-size: 1.1rem;
+}
+
+.onboarding-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.onboarding-select {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition);
+}
+
+.onboarding-select:focus {
+    border-color: var(--accent);
+}
+
+.save-btn {
+    background: var(--accent);
+    color: white;
+    padding: 14px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    margin-top: 10px;
+}
+
+.save-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Theme integration */
+body[data-theme='sapientia'] .onboarding-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+
+body[data-theme='sapientia'] .onboarding-card h1 {
+    color: var(--sap-green);
+}
+
+body[data-theme='sapientia'] .save-btn {
+    background: var(--sap-green);
+}
+
+body[data-theme='sapientia'] .save-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+}

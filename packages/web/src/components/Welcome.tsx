@@ -3,8 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass } from '@shared/index';
-import type { ClassData } from '@shared/lib/types';
+import type { ClassData, BackgroundTheme } from '@shared/lib/types';
 import BackgroundSelector from './backgrounds/BackgroundSelector';
+
+const LAST_DARK_THEME_KEY = 'uni-last-dark-theme';
+const DARK_THEMES: BackgroundTheme[] = ['none', 'aurora', 'pixel-blast', 'silk', 'beams', 'dither', 'iridescence', 'liquid-chrome', 'faulty-terminal'];
+
+function withViewTransition(update: () => void) {
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+        (document as any).startViewTransition(update);
+    } else {
+        update();
+    }
+}
 
 const SunIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -97,7 +108,14 @@ export default function Welcome() {
 
     const toggleTheme = () => {
         const isLight = preferences.backgroundTheme === 'sapientia';
-        updatePreferences({ backgroundTheme: isLight ? 'none' : 'sapientia' });
+        if (isLight) {
+            const stored = localStorage.getItem(LAST_DARK_THEME_KEY) as BackgroundTheme | null;
+            const target = (stored && DARK_THEMES.includes(stored)) ? stored : 'none';
+            withViewTransition(() => updatePreferences({ backgroundTheme: target }));
+        } else {
+            localStorage.setItem(LAST_DARK_THEME_KEY, preferences.backgroundTheme);
+            withViewTransition(() => updatePreferences({ backgroundTheme: 'sapientia' }));
+        }
     };
 
     return (

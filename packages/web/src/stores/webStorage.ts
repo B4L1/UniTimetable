@@ -10,6 +10,10 @@ const KEYS = {
     PREFERENCES: 'unitimetable_preferences',
     IMPORTED_SUBJECTS: 'unitimetable_imported_subjects',
     FAULTY_TERMINAL_UNLOCKED: 'unitimetable_ft_unlocked',
+    REMOVED_SUBJECTS: 'unitimetable_removed_subjects',
+    CUSTOM_ENTRIES: 'unitimetable_custom_entries',
+    USER: 'unitimetable_user',
+    SELECTED_TEACHER: 'unitimetable_selected_teacher',
 };
 
 export const webStorage: IStorage & {
@@ -18,7 +22,16 @@ export const webStorage: IStorage & {
     getImportedSubjects: () => Promise<string[]>,
     setImportedSubjects: (subjects: string[]) => Promise<void>,
     getFaultyTerminalUnlocked: () => Promise<boolean>,
-    setFaultyTerminalUnlocked: (unlocked: boolean) => Promise<void>
+    setFaultyTerminalUnlocked: (unlocked: boolean) => Promise<void>,
+    getRemovedSubjects: () => Promise<string[]>,
+    setRemovedSubjects: (subjects: string[]) => Promise<void>,
+    getCustomEntries: () => Promise<Record<string, { week_type?: 'all' | 'odd' | 'even' }>>,
+    setCustomEntries: (entries: Record<string, { week_type?: 'all' | 'odd' | 'even' }>) => Promise<void>,
+    getUser: () => Promise<any | null>,
+    setUser: (user: any) => Promise<void>,
+    clearUser: () => Promise<void>,
+    getSelectedTeacher: () => Promise<{ id: string, name: string } | null>,
+    setSelectedTeacher: (teacher: { id: string, name: string }) => Promise<void>
 } = {
     async isFirstLaunch(): Promise<boolean> {
         const value = localStorage.getItem(KEYS.FIRST_LAUNCH);
@@ -84,6 +97,9 @@ export const webStorage: IStorage & {
         localStorage.removeItem(KEYS.TIMETABLE_CACHE);
         localStorage.removeItem(KEYS.USER_SELECTIONS);
         localStorage.removeItem(KEYS.IMPORTED_SUBJECTS);
+        localStorage.removeItem(KEYS.REMOVED_SUBJECTS);
+        localStorage.removeItem(KEYS.CUSTOM_ENTRIES);
+        localStorage.removeItem(KEYS.SELECTED_TEACHER);
     },
 
     async getFaultyTerminalUnlocked(): Promise<boolean> {
@@ -93,5 +109,45 @@ export const webStorage: IStorage & {
 
     async setFaultyTerminalUnlocked(unlocked: boolean): Promise<void> {
         localStorage.setItem(KEYS.FAULTY_TERMINAL_UNLOCKED, unlocked ? 'true' : 'false');
+    },
+
+    async getRemovedSubjects(): Promise<string[]> {
+        const value = localStorage.getItem(KEYS.REMOVED_SUBJECTS);
+        return value ? JSON.parse(value) : [];
+    },
+
+    async setRemovedSubjects(subjects: string[]): Promise<void> {
+        localStorage.setItem(KEYS.REMOVED_SUBJECTS, JSON.stringify(subjects));
+    },
+
+    async getCustomEntries(): Promise<Record<string, { week_type?: 'all' | 'odd' | 'even' }>> {
+        const value = localStorage.getItem(KEYS.CUSTOM_ENTRIES);
+        return value ? JSON.parse(value) : {};
+    },
+
+    async setCustomEntries(entries: Record<string, { week_type?: 'all' | 'odd' | 'even' }>): Promise<void> {
+        localStorage.setItem(KEYS.CUSTOM_ENTRIES, JSON.stringify(entries));
+    },
+
+    async getUser(): Promise<any | null> {
+        const value = localStorage.getItem(KEYS.USER);
+        return value ? JSON.parse(value) : null;
+    },
+
+    async setUser(user: any): Promise<void> {
+        localStorage.setItem(KEYS.USER, JSON.stringify(user));
+    },
+
+    async clearUser(): Promise<void> {
+        localStorage.removeItem(KEYS.USER);
+    },
+
+    async getSelectedTeacher(): Promise<{ id: string, name: string } | null> {
+        const value = localStorage.getItem(KEYS.SELECTED_TEACHER);
+        return value ? JSON.parse(value) : null;
+    },
+
+    async setSelectedTeacher(teacher: { id: string, name: string }): Promise<void> {
+        localStorage.setItem(KEYS.SELECTED_TEACHER, JSON.stringify(teacher));
     }
 };

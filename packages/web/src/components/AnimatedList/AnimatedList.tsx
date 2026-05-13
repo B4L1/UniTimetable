@@ -134,7 +134,7 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
                     {items.map((item, index) => (
                         <AnimatedItem
                             key={index}
-                            delay={0.05 * index}
+                            delay={0.02 * index}
                             exitDelay={0.03 * (items.length - 1 - index)}
                             index={index}
                             onMouseEnter={() => handleItemMouseEnter(index)}

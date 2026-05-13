@@ -8,6 +8,13 @@ export interface ClassData {
     created_at: string;
 }
 
+export interface Teacher {
+    id: string;
+    name: string;
+    edupage_id: string | null;
+    created_at: string;
+}
+
 export interface TimetableEntry {
     id: string;
     class_id: string;
@@ -20,6 +27,8 @@ export interface TimetableEntry {
     end_time: string;
     week_type: 'all' | 'odd' | 'even';
     color: string | null;
+    teacher_id?: string | null;
+    class_names?: string | null;
     scraped_at: string;
 }
 

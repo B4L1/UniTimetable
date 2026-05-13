@@ -5,18 +5,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "share": "node start-tunnel.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.4",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
     "@react-three/postprocessing": "^3.0.4",
     "@supabase/supabase-js": "^2.88.0",
+    "@types/jwt-decode": "^3.1.0",
+    "@types/react-select": "^5.0.1",
     "@unitimetable/shared": "workspace:*",
     "i18next": "^25.7.3",
+    "jwt-decode": "^4.0.0",
     "motion": "^12.23.26",
     "ogl": "^1.0.11",
     "postprocessing": "^6.38.1",
@@ -24,6 +29,7 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^16.5.0",
     "react-router-dom": "^7.10.1",
+    "react-select": "^5.10.2",
     "three": "^0.182.0",
     "zustand": "^5.0.9"
   },

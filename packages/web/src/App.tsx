@@ -7,21 +7,59 @@ import Planner from './components/Planner';
 import Settings from './components/Settings';
 import BackgroundSelector from './components/backgrounds/BackgroundSelector';
 import Welcome from './components/Welcome';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import ImportSubjectModal from './components/ImportSubjectModal';
 import Dock, { type DockItemData } from './components/Dock';
 import MobileMenu from './components/MobileMenu';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { formatClassName } from './utils/format';
 import type { BackgroundTheme } from '@shared/lib/types';
 import { setSubjectPalette, DEFAULT_SUBJECT_COLORS } from '@shared/index';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import Login from './components/Login';
+import Onboarding from './components/Onboarding';
 import './index.css';
 
-type Tab = 'timetable' | 'planner' | 'settings';
+type Tab = 'timetable' | 'planner' | 'settings' | 'privacy';
 
 // Theme list for cycling
 const BACKGROUND_THEMES: BackgroundTheme[] = [
   'none', 'sapientia', 'aurora', 'pixel-blast',
   'iridescence', 'liquid-chrome', 'faulty-terminal'
 ];
+
+// All themes except sapientia are dark
+const DARK_THEMES: BackgroundTheme[] = BACKGROUND_THEMES.filter(t => t !== 'sapientia');
+
+// localStorage key for remembering the last dark theme used
+const LAST_DARK_THEME_KEY = 'uni-last-dark-theme';
+
+/** Wrap a state update in a View Transition if the browser supports it */
+function withViewTransition(update: () => void) {
+  if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+    (document as any).startViewTransition(update);
+  } else {
+    update();
+  }
+}
+
+/** Toggle between sapientia (light) and the last dark theme, with smooth animation */
+function buildToggleTheme(
+  currentTheme: BackgroundTheme,
+  updatePreferences: (p: Partial<{ backgroundTheme: BackgroundTheme }>) => void,
+) {
+  const isLight = currentTheme === 'sapientia';
+  if (isLight) {
+    // Switching to dark — restore the last used dark theme
+    const stored = localStorage.getItem(LAST_DARK_THEME_KEY) as BackgroundTheme | null;
+    const target = (stored && DARK_THEMES.includes(stored)) ? stored : 'none';
+    withViewTransition(() => updatePreferences({ backgroundTheme: target }));
+  } else {
+    // Switching to light — remember current dark theme first
+    localStorage.setItem(LAST_DARK_THEME_KEY, currentTheme);
+    withViewTransition(() => updatePreferences({ backgroundTheme: 'sapientia' }));
+  }
+}
 
 // Clean SVG icons
 const CalendarIcon = () => (
@@ -82,27 +120,51 @@ const SaveIcon = () => (
   </svg>
 );
 
+const ManageIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" />
+    <line x1="17" y1="14" x2="17" y2="21" />
+    <line x1="14" y1="17.5" x2="21" y2="17.5" />
+  </svg>
+);
+
 function App() {
-  const { initialize, isLoading, preferences, updatePreferences, selectedClass, isFirstLaunch, isFaultyTerminalUnlocked } = useAppStore();
-  const [activeTab, setActiveTab] = useState<Tab>('timetable');
+  const { initialize, isLoading, preferences, updatePreferences, selectedClass, isFirstLaunch, isFaultyTerminalUnlocked, user } = useAppStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
   const [includeCrossMajor, setIncludeCrossMajor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const isMobile = useMediaQuery('(max-width: 768px)');
   const plannerSaveRef = useRef<(() => void) | null>(null);
+
+  // Derive active tab from pathname
+  const activeTab: Tab = useMemo(() => {
+    const path = location.pathname;
+    if (path === '/planner') return 'planner';
+    if (path === '/settings') return 'settings';
+    if (path === '/privacy') return 'privacy';
+    return 'timetable';
+  }, [location.pathname]);
+
+  const setActiveTab = (tab: Tab) => {
+    if (tab === 'timetable') navigate('/');
+    else navigate(`/${tab}`);
+  };
 
   // Initialize store on mount
   useEffect(() => {
     initialize();
   }, []);
 
-  // Toggle Light/Dark theme (sapientia vs none)
-  const toggleTheme = () => {
-    const isLight = preferences.backgroundTheme === 'sapientia';
-    updatePreferences({ backgroundTheme: isLight ? 'none' : 'sapientia' });
-  };
+  // Toggle Light/Dark theme — restores last dark theme when switching back
+  const toggleTheme = () => buildToggleTheme(preferences.backgroundTheme, updatePreferences);
 
   // Handle save from dock (calls Planner's save function)
   const handleSave = () => {
@@ -152,6 +214,84 @@ function App() {
     );
   }
 
+  return (
+    <Routes>
+      <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+      <Route path="/onboarding" element={user && !user.selectionId ? <Onboarding /> : <Navigate to="/" />} />
+      <Route
+        path="*"
+        element={
+          !user ? (
+            <Navigate to="/login" />
+          ) : !user.selectionId ? (
+            <Navigate to="/onboarding" />
+          ) : (
+            <MainAppLayout
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              preferences={preferences}
+              updatePreferences={updatePreferences}
+              selectedClass={selectedClass}
+              isFirstLaunch={isFirstLaunch}
+              selectionCount={selectionCount}
+              setSelectionCount={setSelectionCount}
+              plannerSearchQuery={plannerSearchQuery}
+              setPlannerSearchQuery={setPlannerSearchQuery}
+              includeCrossMajor={includeCrossMajor}
+              setIncludeCrossMajor={setIncludeCrossMajor}
+              isSaving={isSaving}
+              setIsSaving={setIsSaving}
+              isMobileMenuOpen={isMobileMenuOpen}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+              showImportModal={showImportModal}
+              setShowImportModal={setShowImportModal}
+              isMobile={isMobile}
+              plannerSaveRef={plannerSaveRef}
+            />
+          )
+        }
+      />
+    </Routes>
+  );
+}
+
+interface MainLayoutProps {
+  activeTab: Tab;
+  setActiveTab: (tab: Tab) => void;
+  preferences: any;
+  updatePreferences: (prefs: any) => void;
+  selectedClass: any;
+  isFirstLaunch: boolean;
+  selectionCount: number;
+  setSelectionCount: (n: number) => void;
+  plannerSearchQuery: string;
+  setPlannerSearchQuery: (s: string) => void;
+  includeCrossMajor: boolean;
+  setIncludeCrossMajor: (b: boolean) => void;
+  isSaving: boolean;
+  setIsSaving: (b: boolean) => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (b: boolean) => void;
+  showImportModal: boolean;
+  setShowImportModal: (b: boolean) => void;
+  isMobile: boolean;
+  plannerSaveRef: React.MutableRefObject<(() => void) | null>;
+}
+
+function MainAppLayout({
+  activeTab, setActiveTab, preferences, updatePreferences, selectedClass,
+  isFirstLaunch, selectionCount, setSelectionCount, plannerSearchQuery,
+  setPlannerSearchQuery, includeCrossMajor, setIncludeCrossMajor,
+  isSaving, setIsSaving, isMobileMenuOpen, setIsMobileMenuOpen,
+  showImportModal, setShowImportModal, isMobile, plannerSaveRef
+}: MainLayoutProps) {
+
+  const handleSave = () => {
+    if (plannerSaveRef.current) {
+      plannerSaveRef.current();
+    }
+  };
+
   if (isFirstLaunch || !selectedClass) {
     return <Welcome />;
   }
@@ -176,22 +316,27 @@ function App() {
       onClick: () => setActiveTab('settings'),
       active: activeTab === 'settings',
     },
-    {
+    ...(activeTab === 'timetable' ? [{
       icon: <ClockIcon />,
       label: 'Idő jelző',
       onClick: () => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator }),
       active: preferences.showTimeIndicator,
       variant: 'toggle',
-    },
+    } as DockItemData] : []),
     {
-      icon: preferences.backgroundTheme === 'sapientia' ? <SunIcon /> : <MoonIcon />,
+      icon: preferences.backgroundTheme !== 'sapientia' ? <SunIcon /> : <MoonIcon />,
       label: preferences.backgroundTheme !== 'sapientia' ? 'Világos mód' : 'Sötét mód',
-      onClick: toggleTheme,
+      onClick: () => buildToggleTheme(preferences.backgroundTheme, updatePreferences),
     },
   ];
 
-  // Add save button only on planner page
   if (activeTab === 'planner') {
+    dockItems.push({
+      icon: <ManageIcon />,
+      label: 'Tárgy kezelés',
+      onClick: () => setShowImportModal(true),
+      className: 'manage-subjects-btn',
+    });
     dockItems.push({
       icon: <SaveIcon />,
       label: isSaving ? 'Mentés...' : 'Mentés',
@@ -213,7 +358,7 @@ function App() {
               <span className="class-badge">
                 {formatClassName(selectedClass.name)}
               </span>
-              {activeTab === 'planner' && selectionCount > 0 && (
+              {activeTab === 'planner' && selectionCount > 0 && !isMobile && (
                 <span className="count-badge">
                   {selectionCount} óra
                 </span>
@@ -259,8 +404,8 @@ function App() {
                     width: '14vw',
                     padding: '8px 12px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    background: 'rgba(26, 26, 36, 0.6)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-secondary)',
                     color: 'var(--text-primary)',
                     fontSize: '0.85rem',
                     outline: 'none',
@@ -272,8 +417,8 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
                   cursor: 'pointer',
                   userSelect: 'none',
                   background: 'rgba(26, 26, 36, 0.6)',
@@ -325,11 +470,16 @@ function App() {
             onIncludeCrossMajorChange={setIncludeCrossMajor}
           />
         )}
-        {activeTab === 'settings' && <Settings />}
+        {activeTab === 'settings' && <Settings onNavigateToPrivacy={() => setActiveTab('privacy')} />}
+        {activeTab === 'privacy' && <PrivacyPolicy onBack={() => setActiveTab('settings')} />}
       </main>
+
+      <ImportSubjectModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+      />
     </div >
   );
 }
 
 export default App;
-

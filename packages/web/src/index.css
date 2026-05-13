@@ -17,6 +17,29 @@
   /* Glass effects - More solid frosty look */
   --glass-bg: rgba(20, 20, 28, 0.8);
   --glass-border: rgba(255, 255, 255, 0.12);
+
+  /* ── Design tokens ─────────────────────────────
+     Radius scale (mirrors Apple's continuous-corner feel)
+     xs  → tiny chips/labels
+     sm  → small inline controls
+     md  → buttons, inputs, standalone controls
+     lg  → cards, panels, dropdowns, modals
+  ──────────────────────────────────────────────── */
+  --radius-xs:   6px;
+  --radius-sm:   8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-pill: 9999px;
+
+  /* Shadow scale */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.14), 0 1px 2px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.10);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.30), 0 4px 10px rgba(0,0,0,0.12);
+  --shadow-xl: 0 24px 56px rgba(0,0,0,0.40), 0 8px 20px rgba(0,0,0,0.14);
+
+  /* Transition */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme='faulty-terminal'],
@@ -65,6 +88,29 @@ body {
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* Smooth theme crossfade for properties that aren't handled by view-transition */
+  transition: background-color 0.45s var(--ease), color 0.35s var(--ease);
+}
+
+/* ── View Transitions API — smooth full-page crossfade on theme switch ────
+   Triggered by document.startViewTransition() in JS.
+   The "theme-switch" named transition uses a circular clip for a polished feel;
+   the default root transition falls back to a simple opacity crossfade.
+──────────────────────────────────────────────────────────────────────────── */
+@keyframes theme-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes theme-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+::view-transition-old(root) {
+  animation: 0.35s var(--ease) both theme-fade-out;
+}
+::view-transition-new(root) {
+  animation: 0.4s var(--ease) both theme-fade-in;
 }
 
 body[data-theme='faulty-terminal'],
@@ -86,7 +132,8 @@ body[data-theme='faulty-terminal'] * {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .glass-header {
@@ -139,7 +186,7 @@ body[data-theme='faulty-terminal'] * {
   font-size: 0.875rem;
   padding: 4px 12px;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(255, 255, 255, 0.1);
   white-space: nowrap;
 }
@@ -150,7 +197,7 @@ body[data-theme='faulty-terminal'] * {
   font-weight: 600;
   padding: 4px 12px;
   background: rgba(99, 102, 241, 0.1);
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(99, 102, 241, 0.2);
   white-space: nowrap;
 }
@@ -167,11 +214,11 @@ body[data-theme='faulty-terminal'] * {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -186,7 +233,7 @@ body[data-theme='faulty-terminal'] * {
 .nav-btn.active {
   background: var(--accent);
   color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
 }
 
 @media (max-width: 640px) {
@@ -200,6 +247,10 @@ body[data-theme='faulty-terminal'] * {
 
   .app-header h1 {
     font-size: 1.1rem;
+  }
+
+  .app-header {
+    padding: 6px 12px;
   }
 }
 
@@ -238,7 +289,7 @@ body[data-theme='faulty-terminal'] * {
   text-align: center;
   font-weight: 600;
   font-size: 0.875rem;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
 }
 
 .day-header.today {
@@ -253,7 +304,7 @@ body[data-theme='faulty-terminal'] * {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   min-height: 0;
 }
 
@@ -269,7 +320,7 @@ body[data-theme='faulty-terminal'] * {
 
 .slot-cell {
   position: relative;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 0;
   min-height: 0;
   /* min-height removed so it conforms to the grid's fractional rows */
@@ -298,8 +349,8 @@ body[data-theme='faulty-terminal'] * {
 /* Mobile Carousel Styles */
 @media (max-width: 768px) {
   .timetable-container {
-    padding: 8px;
-    height: calc(100% - 60px);
+    padding: 4px 8px;
+    height: calc(100% - 24px);
     /* Adjust for header/dock */
     overflow: hidden;
   }
@@ -312,22 +363,22 @@ body[data-theme='faulty-terminal'] * {
     width: 100%;
     overflow: visible;
     /* Let framer-motion handle overflow/positioning */
-    padding-bottom: 20px;
+    padding-bottom: 16px;
   }
 
   .mobile-day-column {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     min-width: 0;
   }
 
   .mobile-timetable-grid {
     display: grid;
-    grid-template-columns: 60px minmax(0, 1fr);
+    grid-template-columns: 50px minmax(0, 1fr);
     /* grid-template-rows will be set via inline styles dynamically */
-    gap: 4px;
+    gap: 2px;
     position: relative;
     width: 100%;
     height: 100%;
@@ -341,15 +392,17 @@ body[data-theme='faulty-terminal'] * {
     justify-content: center;
     align-items: center;
     min-height: 0;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+    padding: 2px;
   }
 
   .mobile-day-header {
-    margin-bottom: 8px;
-    padding: 12px;
+    margin-bottom: 2px;
+    padding: 8px;
     text-align: center;
     font-weight: 700;
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
   }
 }
 
@@ -377,8 +430,9 @@ body[data-theme='faulty-terminal'] * {
 }
 
 .settings-card {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-row {
@@ -388,7 +442,7 @@ body[data-theme='faulty-terminal'] * {
   padding: 14px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background var(--transition);
 }
 
 .settings-row:hover {
@@ -465,11 +519,11 @@ body[data-theme='faulty-terminal'] * {
 /* Buttons */
 .btn {
   padding: 10px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   border: none;
 }
 
@@ -482,10 +536,10 @@ body[data-theme='faulty-terminal'] * {
   background: var(--accent-hover);
 }
 
-/* Scrollbar */
+/* Scrollbar — thin, Apple-like */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -493,12 +547,12 @@ body[data-theme='faulty-terminal'] * {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.30);
 }
 
 /* Welcome Screen */
@@ -558,7 +612,7 @@ body[data-theme='faulty-terminal'] * {
 select {
   width: 100%;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: rgba(18, 18, 26, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
@@ -703,13 +757,13 @@ select:focus {
 
 .planner-slot-cell {
   position: relative;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 0;
   min-height: 86px;
   height: 86px;
   /* Fixed height for percentage-based children to work */
   border: 2px solid transparent;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   cursor: default;
   /* overflow: hidden; removed to allow classes to span cells natively */
 }
@@ -741,11 +795,10 @@ select:focus {
 
 /* Custom card styling when inside the planner */
 .planner-slot-cell .class-card {
-  border-radius: 12px;
-  /* Match the 12px outer radius precisely */
+  border-radius: var(--radius-md);
   height: 100%;
   width: 100%;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color var(--transition), box-shadow var(--transition);
   border: 2px solid transparent;
 }
 
@@ -765,8 +818,8 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  transition: background 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: background var(--transition);
 }
 
 .planner-slot-cell.clickable .empty-slot-plus:hover {
@@ -837,8 +890,8 @@ select:focus {
   justify-content: center;
   cursor: pointer;
   background: var(--bg-secondary);
-  border-radius: 10px;
-  transition: background 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: background var(--transition);
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-sizing: border-box;
 }
@@ -862,17 +915,55 @@ select:focus {
 /* Planner Dropdown */
 .planner-dropdown {
   position: absolute;
-  z-index: 100;
-  padding: 4px;
-  max-height: 400px;
-  overflow: hidden;
+  z-index: 2000;
+  padding: 8px;
+  max-height: 320px;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   animation: slideDown 0.2s ease;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  box-shadow: var(--shadow-xl);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.planner-dropdown::-webkit-scrollbar {
+  display: none;
+}
+
+/* Dropdown delete button */
+.dropdown-delete-btn {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: #ff4444 !important;
+  border: 1px solid #ff0000 !important;
+  border-radius: var(--radius-sm);
+  color: white !important;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+}
+
+.dropdown-delete-btn:hover {
+  background: #ff1111 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+}
+
+body[data-theme='sapientia'] .dropdown-delete-btn {
+  background: #ef4444 !important;
+  border-color: #dc2626 !important;
 }
 
 @keyframes slideDown {
@@ -899,7 +990,7 @@ select:focus {
 
 .dropdown-clear-btn {
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   text-align: center;
   cursor: pointer;
   color: var(--error);
@@ -917,8 +1008,8 @@ select:focus {
 /* Responsive adjustments for Planner */
 @media (max-width: 768px) {
   .planner-container {
-    padding: 12px 10px;
-    height: 100%;
+    padding: 4px 6px;
+    height: calc(100% - 16px);
     overflow: hidden;
     position: relative;
   }
@@ -928,7 +1019,7 @@ select:focus {
     height: 100%;
     width: 100%;
     overflow: hidden;
-    padding-bottom: 20px;
+    padding-bottom: 0;
   }
 
   .planner-grid-container.mobile {
@@ -941,19 +1032,19 @@ select:focus {
   .planner-day-column {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 4px;
   }
 
   .planner-day-column .planner-column-header {
-    font-size: 1.125rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--text-primary);
-    padding: 8px 12px;
+    padding: 6px 12px;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     border-left: 4px solid var(--accent);
     text-align: left;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
   [data-theme='sapientia'] .planner-day-column .planner-column-header {
@@ -962,9 +1053,12 @@ select:focus {
 
   .planner-slots-stack {
     display: grid;
-    grid-template-columns: 60px minmax(0, 1fr);
-    gap: 4px;
+    grid-template-columns: 50px minmax(0, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 3px;
     position: relative;
+    flex: 1;
+    min-height: 0;
   }
 
   .mobile-time-labels {
@@ -976,28 +1070,29 @@ select:focus {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 2px;
-    padding: 12px 0;
-    font-size: 0.75rem;
+    gap: 1px;
+    padding: 4px 0;
+    font-size: 0.65rem;
     color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.02);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    height: 86px;
     box-sizing: border-box;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    min-height: 0;
   }
 
   .mobile-time-label span:first-child {
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.8rem;
+    font-size: 0.7rem;
   }
 
   .planner-slot-cell {
     width: 100%;
     min-width: 0;
-    height: 86px;
+    min-height: 0;
+    height: 100%;
   }
 }
 
@@ -1041,7 +1136,7 @@ select:focus {
 }
 
 .planner-slot-cell .slot-single .class-card {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .dropdown-divider::before,
@@ -1060,6 +1155,22 @@ select:focus {
 .half-slot-card-wrapper {
   position: relative;
   overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* Single (full-week) wrapper: all four corners rounded */
+.half-slot-card-wrapper.slot-single {
+  border-radius: var(--radius-md);
+}
+
+/* Top half (odd-week): rounded top, flat bottom join */
+.half-slot-card-wrapper.slot-top {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+/* Bottom half (even-week): flat top join, rounded bottom */
+.half-slot-card-wrapper.slot-bottom {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 .half-slot-delete-btn {
@@ -1103,7 +1214,7 @@ select:focus {
   -webkit-backdrop-filter: blur(4px);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 2px 6px;
   font-size: 10px;
   font-weight: bold;
@@ -1157,13 +1268,10 @@ body[data-theme='faulty-terminal'] .planner-slot-cell .half-slot-card-wrapper.ac
 /* Retro Sharp & Pixelated/Dashed Borders */
 body[data-theme='faulty-terminal'] .class-card,
 body[data-theme='faulty-terminal'] .glass-card,
-body[data-theme='faulty-terminal'] .planner-slot-cell,
 body[data-theme='faulty-terminal'] .planner-dropdown,
 body[data-theme='faulty-terminal'] .dock-panel,
 body[data-theme='faulty-terminal'] .dock-item,
-body[data-theme='faulty-terminal'] .glass-header,
 body[data-theme='faulty-terminal'] .btn,
-body[data-theme='faulty-terminal'] .mobile-menu-drawer,
 body[data-theme='faulty-terminal'] .class-badge,
 body[data-theme='faulty-terminal'] .count-badge,
 body[data-theme='faulty-terminal'] .planner-search-input,
@@ -1171,6 +1279,11 @@ body[data-theme='faulty-terminal'] .planner-search-label,
 body[data-theme='faulty-terminal'] .dropdown-clear-btn,
 body[data-theme='faulty-terminal'] .half-slot-delete-btn,
 body[data-theme='faulty-terminal'] .half-slot-plus,
+body[data-theme='faulty-terminal'] .planner-settings-btn,
+body[data-theme='faulty-terminal'] .planner-modify-panel,
+body[data-theme='faulty-terminal'] .modify-wt-btn,
+body[data-theme='faulty-terminal'] .modify-remove-btn,
+body[data-theme='faulty-terminal'] .modify-reset-btn,
 body[data-theme='faulty-terminal'] .empty-slot-plus {
   border-radius: 0 !important;
 }
@@ -1188,7 +1301,258 @@ body[data-theme='faulty-terminal'] .planner-search-label,
 body[data-theme='faulty-terminal'] .dropdown-clear-btn,
 body[data-theme='faulty-terminal'] .half-slot-delete-btn,
 body[data-theme='faulty-terminal'] .half-slot-plus,
+body[data-theme='faulty-terminal'] .planner-settings-btn,
+body[data-theme='faulty-terminal'] .planner-modify-panel,
 body[data-theme='faulty-terminal'] .planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
   border-style: dashed !important;
   border-width: 2px !important;
+}
+
+/* ============================================ */
+/* Planner Settings/Cog Button */
+/* ============================================ */
+.planner-settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: #2a2a3a;
+  border: 1px solid var(--border);
+}
+
+.planner-settings-btn:hover {
+  background: #3a3a4a;
+}
+
+.planner-settings-btn svg {
+  opacity: 0.7;
+}
+
+.planner-settings-btn:hover svg {
+  opacity: 1;
+}
+
+/* Sapientia theme */
+body[data-theme='sapientia'] .planner-settings-btn {
+  background: #e2e8f0;
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+body[data-theme='sapientia'] .planner-settings-btn:hover {
+  background: #cbd5e1;
+}
+
+/* Faulty Terminal theme */
+body[data-theme='faulty-terminal'] .planner-settings-btn {
+  background: rgba(0, 40, 0, 0.6);
+  color: #00ff41;
+  border: 2px dashed rgba(0, 255, 65, 0.4);
+}
+
+body[data-theme='faulty-terminal'] .planner-settings-btn:hover {
+  background: rgba(0, 60, 0, 0.8);
+  border-color: rgba(0, 255, 65, 0.7);
+}
+
+/* ============================================ */
+/* Planner Modify Panel */
+/* ============================================ */
+.planner-modify-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.modify-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modify-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition);
+}
+
+.modify-panel-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.modify-panel-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modify-panel-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.modify-panel-options {
+  display: flex;
+  gap: 6px;
+}
+
+.modify-wt-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+.modify-wt-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.modify-wt-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.modify-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.modify-remove-btn {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error, #ef4444);
+  text-align: center;
+}
+
+.modify-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.modify-reset-btn {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.modify-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* Sapientia overrides */
+body[data-theme='sapientia'] .planner-modify-panel {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+body[data-theme='sapientia'] .modify-panel-header {
+  background: #f8fafc;
+}
+
+body[data-theme='sapientia'] .modify-wt-btn {
+  background: #f1f5f9;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+body[data-theme='sapientia'] .modify-wt-btn:hover {
+  background: #e2e8f0;
+  color: var(--text-primary);
+}
+
+body[data-theme='sapientia'] .modify-wt-btn.active {
+  background: var(--sap-green);
+  color: white;
+  border-color: var(--sap-green);
+}
+
+/* Faulty Terminal overrides */
+body[data-theme='faulty-terminal'] .planner-modify-panel {
+  background: rgba(0, 20, 0, 0.9);
+  border-color: rgba(0, 255, 65, 0.3);
+}
+
+body[data-theme='faulty-terminal'] .modify-panel-header {
+  background: rgba(0, 40, 0, 0.5);
+  border-color: rgba(0, 255, 65, 0.2);
+}
+
+body[data-theme='faulty-terminal'] .modify-wt-btn {
+  background: rgba(0, 40, 0, 0.5);
+  color: #008f11;
+  border-color: rgba(0, 255, 65, 0.2);
+}
+
+body[data-theme='faulty-terminal'] .modify-wt-btn:hover {
+  background: rgba(0, 60, 0, 0.7);
+  color: #00ff41;
+}
+
+body[data-theme='faulty-terminal'] .modify-wt-btn.active {
+  background: rgba(0, 255, 65, 0.2);
+  color: #00ff41;
+  border-color: #00ff41;
+}
+
+body[data-theme='faulty-terminal'] .modify-remove-btn {
+  background: rgba(255, 0, 0, 0.15);
+  color: #ff0000;
+  border-color: rgba(255, 0, 0, 0.3);
+}
+
+body[data-theme='faulty-terminal'] .modify-reset-btn {
+  background: rgba(0, 40, 0, 0.5);
+  color: #008f11;
+  border-color: rgba(0, 255, 65, 0.2);
 }

@@ -53,8 +53,8 @@ body[data-theme='sapientia'] .glass-card {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     box-shadow: var(--shadow-sm);
-    border-radius: 8px;
-    /* Sharper corners for academic look */
+    border-radius: 12px;
+    /* Slightly tighter corners for the academic light theme */
 }
 
 body[data-theme='sapientia'] .glass-header {
@@ -161,11 +161,40 @@ body[data-theme='sapientia'] .class-card {
 
 /* Bi-weekly overlay overrides for Sapientia (light theme) */
 body[data-theme='sapientia'] .class-card.is-odd-week::before {
-    background: linear-gradient(-45deg, var(--sap-navy-light) 50%, transparent 50.1%);
+    background: linear-gradient(-45deg, var(--sap-bg-alt, #f5f5f5) 50%, transparent 50.1%);
 }
 
 body[data-theme='sapientia'] .class-card.is-even-week::before {
-    background: linear-gradient(-45deg, transparent 49.9%, var(--sap-navy-light) 50%);
+    background: linear-gradient(-45deg, transparent 49.9%, var(--sap-bg-alt, #f5f5f5) 50%);
+}
+
+body[data-theme='sapientia'] .class-card--dropdown.is-odd-week.is-custom::before {
+    background: linear-gradient(-45deg, 
+        var(--sap-bg-alt, #f5f5f5) 43%, 
+        var(--subject-color) 43%, var(--subject-color) 46%, 
+        var(--sap-bg-alt, #f5f5f5) 46%, var(--sap-bg-alt, #f5f5f5) 50%, 
+        transparent 50%
+    );
+}
+
+body[data-theme='sapientia'] .class-card--dropdown.is-even-week.is-custom::before {
+    background: linear-gradient(-45deg, 
+        transparent 50%, 
+        var(--sap-bg-alt, #f5f5f5) 50%, var(--sap-bg-alt, #f5f5f5) 54%, 
+        var(--subject-color) 54%, var(--subject-color) 57%, 
+        var(--sap-bg-alt, #f5f5f5) 57%
+    );
+}
+
+body[data-theme='sapientia'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
+    content: "";
+    position: absolute; top:0; left:0; right:0; bottom:0;
+    pointer-events: none; border-radius: inherit; z-index: -1;
+    background: linear-gradient(-45deg,
+        transparent 47%,
+        var(--sap-bg-alt, #f5f5f5) 47%, var(--sap-bg-alt, #f5f5f5) 51%,
+        transparent 51%
+    );
 }
 
 /* Ensure text inherits white color */
@@ -269,3 +298,42 @@ body[data-theme='sapientia'] .time-marker {
     height: 3px !important;
     /* Slightly thicker for visibility on light theme */
 }
+
+/* Settings Rows & Dropdowns for Sapientia */
+body[data-theme='sapientia'] .settings-row {
+    border-bottom: 1px solid var(--border);
+}
+
+body[data-theme='sapientia'] .settings-row:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+body[data-theme='sapientia'] .dropdown-content {
+    border-top: 1px solid var(--border);
+}
+
+body[data-theme='sapientia'] .dropdown-option:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme='sapientia'] .dropdown-option.selected {
+    background: rgba(10, 108, 66, 0.1);
+}
+
+/* Scrollbar for Sapientia */
+body[data-theme='sapientia'] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+body[data-theme='sapientia'] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Destructive Actions (Logout) */
+.destructive-text {
+    color: var(--error) !important;
+}
+
+.logout-row:hover {
+    background: rgba(220, 38, 38, 0.05) !important;
+}

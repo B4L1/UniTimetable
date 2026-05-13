@@ -56,7 +56,9 @@ async function clickClassesButton(page) {
     const clicked = await page.evaluate(() => {
         const elements = document.querySelectorAll('span, div, b, a');
         for (const el of elements) {
-            if (el.textContent && el.textContent.trim() === 'Osztályok') {
+            const text = el.textContent?.trim() || '';
+            const title = el.getAttribute('title')?.trim() || '';
+            if (text === 'Osztályok' || title === 'Osztályok') {
                 el.click();
                 return true;
             }
@@ -65,6 +67,42 @@ async function clickClassesButton(page) {
     });
     if (clicked) await new Promise(r => setTimeout(r, 1500));
     return clicked;
+}
+
+/**
+ * Click the "Tanárok" button
+ */
+async function clickTeachersButton(page) {
+    const clicked = await page.evaluate(() => {
+        const elements = document.querySelectorAll('span, div, b, a');
+        for (const el of elements) {
+            const text = el.textContent?.trim() || '';
+            const title = el.getAttribute('title')?.trim() || '';
+            if (text === 'Tanárok' || title === 'Tanárok') {
+                el.click();
+                return true;
+            }
+        }
+        return false;
+    });
+    if (clicked) await new Promise(r => setTimeout(r, 1500));
+    return clicked;
+}
+
+/**
+ * Dismiss cookies
+ */
+async function dismissCookies(page) {
+    return await page.evaluate(() => {
+        const buttons = document.querySelectorAll('button, span, div');
+        for (const btn of buttons) {
+            if (btn.textContent?.trim() === 'Rendben') {
+                btn.click();
+                return true;
+            }
+        }
+        return false;
+    });
 }
 
 /**
@@ -104,6 +142,88 @@ async function extractClasses(page) {
 }
 
 /**
+ * Helper to validate teacher names
+ */
+function isValidTeacherName(name) {
+    if (!name) return false;
+    const trimmed = name.trim();
+    if (trimmed.length < 3) return false;
+    
+    const lower = trimmed.toLowerCase();
+    if (lower === 'rendben') return false;
+    
+    const trashKeywords = [
+        'akadálymentesített', 'asc edupage', 'asc timetables',
+        'összesített', 'tanárok', 'osztályok', 'tantermek',
+        'tantárgyak', 'főoldal', 'órarend', 'kapcsolat'
+    ];
+    if (trashKeywords.some(kw => lower.includes(kw))) return false;
+
+    // Must contain at least a space (first and last name)
+    if (!trimmed.includes(' ')) return false;
+    // Disallow digits
+    if (/\d/.test(trimmed)) return false;
+    // Support unicode letters
+    if (/[^\p{L}\s\.-]/u.test(trimmed)) return false;
+    return true;
+}
+
+/**
+ * Extract teacher list
+ */
+async function extractTeachers(page) {
+    console.log('👨‍🏫 Extracting teacher list...');
+    await clickTeachersButton(page);
+    console.log('   ✓ Clicked Tanárok');
+    
+    // Debug screenshot
+    await page.screenshot({ path: 'teacher_debug.png' });
+    
+    // Wait for the context menu to appear
+    try {
+        await page.waitForSelector('.body .asc-context-menu a, .body a', { timeout: 5000 });
+    } catch (e) {
+        console.log('   ⚠ Timeout waiting for teacher list, trying heuristic...');
+    }
+    
+    await new Promise(r => setTimeout(r, 1500));
+
+    const debugInfo = await page.evaluate(() => {
+        const links = document.querySelectorAll('a, li, span');
+        const first5 = Array.from(links).slice(0, 15).map(el => el.textContent?.trim()).filter(Boolean);
+        return { count: links.length, first5 };
+    });
+    console.log(`   DEBUG: Found ${debugInfo.count} total elements, first few:`, debugInfo.first5.join(', '));
+
+    const teachers = await page.evaluate(() => {
+        const result = [];
+        // Broad search for anything that looks like a name in a list
+        const elements = document.querySelectorAll('.asc-context-menu a, .asc-context-menu li, .body a, a');
+        
+        const seen = new Set();
+        elements.forEach((el, index) => {
+            const name = el.textContent?.trim() || '';
+            // Heuristic to avoid titles and class patterns (Roman numerals followed by dot and letter)
+            const isClass = /[IVX]+\.\s*[A-Z]/.test(name);
+            const isMenu = name === 'Tanárok' || name === 'Osztályok' || name === 'Tantermek' || name === 'Tantárgyak';
+            
+            if (name && name.length > 2 && !isClass && !isMenu) {
+                // Heuristic: Teachers in this list usually have "Name Initials" or "Dr. Name"
+                // But it's safer to just take everything that doesn't look like a class or menu
+                if (!seen.has(name)) {
+                    result.push({ name, edupageId: `teacher-${index}` });
+                    seen.add(name);
+                }
+            }
+        });
+        return result;
+    });
+
+    console.log(`   Found ${teachers.length} teachers`);
+    return teachers;
+}
+
+/**
  * Get day index from Y coordinate
  */
 function getDayFromY(y) {
@@ -126,25 +246,47 @@ function getSlotFromX(x) {
 }
 
 /**
+ * Extract name from SVG header
+ */
+async function extractNameFromHeader(page) {
+    return await page.evaluate(() => {
+        // The teacher's name or class name is the first <text> in the SVG
+        const textElement = document.querySelector('div.print-nobreak svg g text');
+        return textElement ? textElement.textContent.trim() : null;
+    });
+}
+
+/**
  * Extract timetable from SVG
  */
-async function extractTimetable(page, classInfo) {
-    console.log(`📅 Extracting timetable for: ${classInfo.name}`);
+async function extractTimetable(page, targetName, mode = 'class') {
+    console.log(`📅 Extracting ${mode} timetable for: ${targetName}`);
 
-    // Click on the class
+    // 1. Ensure menu is open (Tanárok or Osztályok)
+    if (mode === 'teacher') {
+        await clickTeachersButton(page);
+    } else {
+        await clickClassesButton(page);
+    }
+    await new Promise(r => setTimeout(r, 1000));
+
+    // 2. Click on the item (class or teacher)
     const clicked = await page.evaluate((name) => {
-        const links = document.querySelectorAll('a');
-        for (const link of links) {
-            if (link.textContent && link.textContent.trim() === name) {
-                link.click();
+        // Look in context menus first
+        const elements = document.querySelectorAll('.asc-context-menu a, .asc-context-menu span, .body a, a');
+        for (const el of elements) {
+            if (el.textContent?.trim() === name) {
+                el.click();
+                // Check if we need to click a parent or child? 
+                // Usually el.click() works if it's the actual interactive element
                 return true;
             }
         }
         return false;
-    }, classInfo.name);
+    }, targetName);
 
     if (!clicked) {
-        console.log('   ✗ Could not click class');
+        console.log(`   ✗ Could not click ${mode}: ${targetName}`);
         return [];
     }
 
@@ -152,10 +294,8 @@ async function extractTimetable(page, classInfo) {
     await new Promise(r => setTimeout(r, 2500));
 
     // Extract from SVG
-    const entries = await page.evaluate(() => {
+    const entries = await page.evaluate((mode) => {
         const result = [];
-
-        // Find all rect elements with title children (these are the class cells)
         const rects = document.querySelectorAll('rect');
 
         rects.forEach(rect => {
@@ -165,15 +305,13 @@ async function extractTimetable(page, classInfo) {
             const titleText = title.textContent?.trim() || '';
             if (!titleText || titleText.length < 3) return;
 
-            // Parse title: "Subject\nTeacher\nRoom"
             const lines = titleText.split('\n').map(l => l.trim()).filter(Boolean);
             if (lines.length < 1) return;
 
             const subjectName = lines[0] || '';
-            const teacherName = lines[1] || '';
+            let metaInfo = lines[1] || ''; // Teacher name in class view, Class names in teacher view
             const classroom = lines[2] || '';
 
-            // Skip if it's not a real class entry
             if (!subjectName || subjectName.length < 2) return;
 
             // Get position and dimensions
@@ -182,7 +320,7 @@ async function extractTimetable(page, classInfo) {
             const height = parseFloat(rect.getAttribute('height') || '306');
             const width = parseFloat(rect.getAttribute('width') || '213.75');
 
-            // Get color from style
+            // Get color
             const style = rect.getAttribute('style') || '';
             const colorMatch = style.match(/fill:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
             let color = '#6366f1';
@@ -195,7 +333,7 @@ async function extractTimetable(page, classInfo) {
 
             result.push({
                 subjectName,
-                teacherName,
+                metaInfo,
                 classroom,
                 x,
                 y,
@@ -206,39 +344,31 @@ async function extractTimetable(page, classInfo) {
         });
 
         return result;
-    });
+    }, mode);
 
-    // Calculate day and time slot from coordinates
+    // Calculate day and time slot
     const processedEntries = entries.map(entry => {
         const dayOfWeek = getDayFromY(entry.y);
         const startSlot = getSlotFromX(entry.x);
-
-        // Calculate spanned slots
         const numSlots = Math.max(1, Math.round(entry.width / 213.75));
         const endSlot = startSlot + numSlots - 1;
 
         const startTimeSlot = TIME_SLOTS[startSlot] || { start: '08:00', end: '09:00' };
         const endTimeSlot = TIME_SLOTS[endSlot] || TIME_SLOTS[12] || { start: '08:00', end: '09:00' };
 
-        // Determine week type based on height and position
-        // Full height (306) = every week
-        // Half height (153) = bi-weekly
         let weekType = 'all';
         if (entry.height < 200) {
-            // Half-height = bi-weekly
-            // Check position within the day row to determine odd/even
             const dayRange = DAY_Y_RANGES.find(r => r.day === dayOfWeek);
             if (dayRange) {
                 const midPoint = (dayRange.minY + dayRange.maxY) / 2;
-                // If y is in top half, it's odd week; bottom half is even week
                 weekType = entry.y < midPoint ? 'odd' : 'even';
             }
         }
 
         return {
             subjectName: entry.subjectName,
-            teacherCode: '',
-            teacherName: entry.teacherName,
+            teacherName: mode === 'class' ? entry.metaInfo : null,
+            classNames: mode === 'teacher' ? entry.metaInfo : null,
             classroom: entry.classroom,
             dayOfWeek,
             startTime: startTimeSlot.start,
@@ -249,12 +379,6 @@ async function extractTimetable(page, classInfo) {
     }).filter(e => e.dayOfWeek >= 0 && e.dayOfWeek <= 4);
 
     console.log(`   Found ${processedEntries.length} entries`);
-
-    // Show first few
-    processedEntries.slice(0, 3).forEach(e => {
-        console.log(`   - ${e.subjectName} (Day ${e.dayOfWeek}, ${e.startTime})`);
-    });
-
     return processedEntries;
 }
 
@@ -288,22 +412,53 @@ async function saveClasses(classes) {
 }
 
 /**
+ * Save teachers to Supabase
+ */
+async function saveTeachers(teachers) {
+    if (teachers.length === 0) return [];
+    console.log('💾 Saving teachers to Supabase...');
+
+    const { data, error } = await supabase
+        .from('teachers')
+        .upsert(
+            teachers.map(t => ({
+                name: t.name,
+                edupage_id: t.edupageId,
+            })),
+            { onConflict: 'name' }
+        )
+        .select();
+
+    if (error) {
+        console.error('   Error:', error.message);
+        return [];
+    }
+    console.log(`   ✓ Saved ${data.length} teachers`);
+    return data;
+}
+
+/**
  * Save timetable entries
  */
-async function saveTimetableEntries(classId, entries) {
+async function saveTimetableEntries(targetId, entries, mode = 'class') {
     if (entries.length === 0) return [];
-    console.log(`💾 Saving ${entries.length} entries...`);
+    console.log(`💾 Saving ${entries.length} entries for ${mode}...`);
 
-    await supabase.from('timetable_entries').delete().eq('class_id', classId);
+    if (mode === 'class') {
+        await supabase.from('timetable_entries').delete().eq('class_id', targetId);
+    } else {
+        await supabase.from('timetable_entries').delete().eq('teacher_id', targetId);
+    }
 
     const { data, error } = await supabase
         .from('timetable_entries')
         .insert(
             entries.map(e => ({
-                class_id: classId,
+                class_id: mode === 'class' ? targetId : null,
+                teacher_id: mode === 'teacher' ? targetId : null,
                 subject_name: e.subjectName,
-                teacher_code: e.teacherCode,
                 teacher_name: e.teacherName,
+                class_names: e.classNames,
                 classroom: e.classroom,
                 day_of_week: e.dayOfWeek,
                 start_time: e.startTime,
@@ -342,14 +497,52 @@ async function scrape(testMode = false) {
         console.log('🌐 Loading edupage...');
         await page.goto(EDUPAGE_URL, { waitUntil: 'networkidle2', timeout: 30000 });
         await new Promise(r => setTimeout(r, 3000));
+        
+        await dismissCookies(page);
+        console.log('   ✓ Cookies dismissed (if any)');
+        await new Promise(r => setTimeout(r, 1000));
 
         const classes = await extractClasses(page);
         if (classes.length === 0) {
             console.log('❌ No classes found');
             return;
+            // return; // Don't return if no classes, teachers might still be there
         }
 
         const savedClasses = await saveClasses(classes);
+        
+        // 2. Teachers
+        const rawTeachers = await extractTeachers(page);
+        // Filter out trash or invalid names
+        const teachersToProcess = rawTeachers.filter(t => isValidTeacherName(t.name));
+        const teachersSubset = testMode ? teachersToProcess.slice(0, 1) : teachersToProcess;
+
+        console.log(`\n📋 Processing ${teachersSubset.length} teacher(s)...\n`);
+        
+        for (const teacherInfo of teachersSubset) {
+            const entries = await extractTimetable(page, teacherInfo.name, 'teacher');
+            const verifiedName = await extractNameFromHeader(page) || teacherInfo.name;
+            
+            // Upsert teacher with verified name
+            const { data: savedTeacher, error: upsertError } = await supabase
+                .from('teachers')
+                .upsert({ name: verifiedName, edupage_id: teacherInfo.edupageId }, { onConflict: 'name' })
+                .select()
+                .single();
+            if (upsertError) {
+                console.error('   Error upserting teacher:', upsertError.message);
+                continue;
+            }
+
+            if (savedTeacher && entries.length > 0) {
+                await saveTimetableEntries(savedTeacher.id, entries, 'teacher');
+            }
+            
+            await clickTeachersButton(page);
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // 3. Classes
         const classesToProcess = testMode ? classes.slice(0, 1) : classes;
 
         console.log(`\n📋 Processing ${classesToProcess.length} class(es)...\n`);
@@ -358,9 +551,9 @@ async function scrape(testMode = false) {
             const savedClass = savedClasses.find(c => c?.edupage_id === classInfo.edupageId);
             if (!savedClass) continue;
 
-            const entries = await extractTimetable(page, classInfo);
+            const entries = await extractTimetable(page, classInfo.name, 'class');
             if (entries.length > 0) {
-                await saveTimetableEntries(savedClass.id, entries);
+                await saveTimetableEntries(savedClass.id, entries, 'class');
             }
 
             await clickClassesButton(page);

@@ -65,7 +65,7 @@ interface PlannerProps {
 }
 
 export default function Planner({ onSaveRef, onCountChange, onSavingChange, classTypeSearch = '', onClassTypeSearchChange, includeCrossMajor, onIncludeCrossMajorChange }: PlannerProps) {
-    const { selectedClass, userSelections, addSelection, removeSelection, clearSelections, importedSubjects } = useAppStore();
+    const { selectedClass, userSelections, addSelection, removeSelection, setSelections, clearSelections, importedSubjects, removedSubjects, customEntries, addRemovedSubject, setCustomEntry, removeCustomEntry } = useAppStore();
 
     const [availableClasses, setAvailableClasses] = useState<Map<string, AvailableClassEntry[]>>(new Map());
     const [selectedSlots, setSelectedSlots] = useState<Map<string, AvailableClassEntry[]>>(new Map());
@@ -74,7 +74,8 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const [activeHalf, setActiveHalf] = useState<'odd' | 'even' | 'full' | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [dropdownPos, setDropdownPos] = useState<{ left: number; top?: number; bottom?: number; width: number } | null>(null);
+    const [dropdownPos, setDropdownPos] = useState<{ left: number; top?: number; bottom?: number; width: number; maxHeight?: number } | null>(null);
+    const [modifyingEntry, setModifyingEntry] = useState<AvailableClassEntry | null>(null);
 
     // Mobile Carousel State
     const today = new Date().getDay() - 1; // 0 = Monday
@@ -160,7 +161,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             // Include importedSubjects as dependency to trigger reload when they change
             loadAvailableClasses();
         }
-    }, [selectedClass?.id, includeCrossMajor, importedSubjects]); // Added importedSubjects dependency
+    }, [selectedClass?.id, includeCrossMajor, importedSubjects, removedSubjects]); // Added removedSubjects dependency
 
     const syncedClassId = useRef<string | null>(null);
 
@@ -170,21 +171,49 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             const newSelectedSlots = new Map<string, AvailableClassEntry[]>();
 
             availableClasses.forEach((classes, key) => {
-                const selectedInSlot: AvailableClassEntry[] = [];
-                classes.forEach(cls => {
-                    if (userSelections.includes(cls.id)) {
-                        selectedInSlot.push(cls);
+                const [dayStr, slotStr] = key.split('-');
+                const dayIndex = parseInt(dayStr, 10);
+                const currentSlotIndex = parseInt(slotStr, 10);
+
+                classes.forEach(rawCls => {
+                    if (userSelections.includes(rawCls.id)) {
+                        const override = customEntries[rawCls.id];
+                        const cls = override ? { ...rawCls, week_type: override.week_type || rawCls.week_type } : rawCls;
+
+                        // Crucial fix: Only anchor the selection to its proper start slot
+                        let entryStartSlot = -1;
+                        TIME_SLOTS.forEach((_, i) => {
+                            const slotStart = getMinutes(TIME_SLOTS[i].start);
+                            const slotEnd = getMinutes(TIME_SLOTS[i].end);
+                            const entryStart = getMinutes(cls.start_time);
+                            const entryEnd = getMinutes(cls.end_time);
+                            if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
+                                if (entryStartSlot === -1) entryStartSlot = i;
+                            }
+                        });
+
+                        const targetSlotIndex = entryStartSlot !== -1 ? entryStartSlot : currentSlotIndex;
+
+                        if (targetSlotIndex === currentSlotIndex) {
+                            const targetKey = `${dayIndex}-${targetSlotIndex}`;
+                            if (!newSelectedSlots.has(targetKey)) {
+                                newSelectedSlots.set(targetKey, []);
+                            }
+
+                            // Prevent duplicates
+                            const existing = newSelectedSlots.get(targetKey)!;
+                            if (!existing.some(e => e.id === cls.id)) {
+                                existing.push(cls);
+                            }
+                        }
                     }
                 });
-                if (selectedInSlot.length > 0) {
-                    newSelectedSlots.set(key, selectedInSlot);
-                }
             });
 
             setSelectedSlots(newSelectedSlots);
             syncedClassId.current = selectedClass.id;
         }
-    }, [userSelections, availableClasses, selectedClass?.id]);
+    }, [userSelections, availableClasses, selectedClass?.id, customEntries]);
 
     // Expose save function to parent via ref
     useEffect(() => {
@@ -278,6 +307,10 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     }
 
                     if (!isDuplicate) {
+                        // Filter out removed subjects
+                        if (removedSubjects.includes(entry.subject_name)) {
+                            return;
+                        }
                         existing.push(entry);
                     }
                 });
@@ -302,6 +335,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             setActiveSlot(null);
             setActiveHalf(null);
             setDropdownPos(null);
+            setModifyingEntry(null);
         } else {
             setActiveSlot({ day: dayIndex, slot: slotIndex });
             setActiveHalf(half);
@@ -326,13 +360,21 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                 const cellRect = cellEl.getBoundingClientRect();
                 const wrapperRect = wrapperEl.getBoundingClientRect();
 
-                const isBottomRows = targetSlotIndex >= TIME_SLOTS.length - 2;
+                const isBottomRows = targetSlotIndex >= TIME_SLOTS.length - 3;
+                
+                // Calculate max available height to prevent page scroll
+                const viewportHeight = window.innerHeight;
+                const margin = 20;
+                const maxHeight = isBottomRows 
+                    ? cellRect.top - margin // Space above cell
+                    : viewportHeight - cellRect.bottom - margin; // Space below cell
 
                 setDropdownPos({
-                    left: cellRect.left - wrapperRect.left - 4,
+                    left: cellRect.left - wrapperRect.left - 8,
                     top: isBottomRows ? undefined : cellRect.bottom - wrapperRect.top + 4,
                     bottom: isBottomRows ? wrapperRect.bottom - cellRect.top + 4 : undefined,
-                    width: cellRect.width + 8,
+                    width: cellRect.width + 16,
+                    maxHeight: Math.min(320, Math.max(200, maxHeight))
                 });
             }
         }
@@ -356,6 +398,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         setActiveSlot(null);
         setActiveHalf(null);
         setDropdownPos(null);
+        setModifyingEntry(null);
     };
 
     const loadDefaults = async () => {
@@ -613,6 +656,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         setActiveSlot(null);
         setActiveHalf(null);
         setDropdownPos(null);
+        setModifyingEntry(null);
     };
 
     const getSlotOptions = (): AvailableClassEntry[] => {
@@ -625,7 +669,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
     const getSelectedEntries = (dayIndex: number, slotIndex: number): AvailableClassEntry[] => {
         const key = `${dayIndex}-${slotIndex}`;
-        return selectedSlots.get(key) || [];
+        const entries = selectedSlots.get(key) || [];
+        return entries.map(entry => {
+            const override = customEntries[entry.id];
+            return override ? { ...entry, week_type: override.week_type || entry.week_type } as AvailableClassEntry : entry;
+        });
     };
 
     // Calculate span for a given entry
@@ -661,25 +709,29 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     };
 
     const normalizedSearch = classTypeSearch.trim().toLowerCase();
+
+    const isEntryMatch = useCallback((entry: AvailableClassEntry) => {
+        if (!normalizedSearch) return false;
+        const searchHaystack = [
+            entry.subject_name || (entry as any).subjectName,
+            entry.teacher_name || (entry as any).teacherName,
+            entry.classroom || (entry as any).classroom,
+            entry.class_name || (entry as any).className,
+            entry.week_type || (entry as any).weekType,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+        return searchHaystack.includes(normalizedSearch);
+    }, [normalizedSearch]);
+
     const highlightedSlotKeys = useMemo(() => {
         if (!normalizedSearch) return new Set<string>();
 
         const matches = new Set<string>();
         availableClasses.forEach((entries, key) => {
-            const hasMatch = entries.some((entry) => {
-                const searchHaystack = [
-                    entry.subject_name,
-                    entry.teacher_name,
-                    entry.classroom,
-                    entry.class_name,
-                    entry.week_type,
-                ]
-                    .filter(Boolean)
-                    .join(' ')
-                    .toLowerCase();
-
-                return searchHaystack.includes(normalizedSearch);
-            });
+            const hasMatch = entries.some(isEntryMatch);
 
             if (hasMatch) {
                 matches.add(key);
@@ -687,16 +739,23 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         });
 
         return matches;
-    }, [availableClasses, normalizedSearch]);
+    }, [availableClasses, normalizedSearch, isEntryMatch]);
 
     // Shared rendering helpers
     const renderCard = (entry: AvailableClassEntry, dayIndex: number, slotIndex: number, position: 'top' | 'bottom' | 'single') => {
-        const { startSlot, span } = getSpanInfo(entry, slotIndex);
+        // Apply custom entry overrides
+        const customOverride = customEntries[entry.id];
+        const effectiveEntry = customOverride
+            ? { ...entry, week_type: customOverride.week_type || entry.week_type }
+            : entry;
+        const isCustom = !!customOverride;
+
+        const { startSlot, span } = getSpanInfo(effectiveEntry, slotIndex);
 
         // Deduplicate rendering: Only render if this slot is the actual start slot
         if (slotIndex !== startSlot) {
             // Render an invisible spacer so flex layout stays intact for the OTHER half
-            return <div key={`${entry.id}-spacer`} style={{ flex: 1, visibility: 'hidden' }} />;
+            return <div key={`${effectiveEntry.id}-spacer`} style={{ flex: 1, visibility: 'hidden' }} />;
         }
 
         const isEntryActive = activeSlot &&
@@ -707,14 +766,20 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         const isAbsolute = span > 1;
         let heightStr = undefined;
         if (isAbsolute) {
-            const CELL_HEIGHT = 86;
-            const GAP = 4;
-            heightStr = `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`;
+            if (isMobile) {
+                // Percentage-based: 100% = one cell, so span cells = span * 100%
+                const GAP = 3;
+                heightStr = `calc(${span * 100}% + ${(span - 1) * GAP}px)`;
+            } else {
+                const CELL_HEIGHT = 86;
+                const GAP = 4;
+                heightStr = `calc(${span * CELL_HEIGHT + (span - 1) * GAP}px)`;
+            }
         }
 
         return (
             <div
-                key={entry.id}
+                key={effectiveEntry.id}
                 className={`half-slot-card-wrapper slot-${position} ${isEntryActive ? 'active' : ''}`}
                 style={{
                     flex: isAbsolute ? undefined : 1,
@@ -728,27 +793,29 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
-                    handleSlotClick(dayIndex, startSlot, entry.week_type === 'all' ? 'full' : entry.week_type as 'odd' | 'even');
+                    handleSlotClick(dayIndex, startSlot, effectiveEntry.week_type === 'all' ? 'full' : effectiveEntry.week_type as 'odd' | 'even');
                 }}
             >
                 <ClassCard
                     data={{
-                        id: entry.id,
-                        subjectName: entry.subject_name || 'Ismeretlen tárgy',
-                        teacherName: entry.teacher_name || '',
-                        classroom: entry.classroom || '',
-                        className: entry.class_name,
+                        id: effectiveEntry.id,
+                        subjectName: effectiveEntry.subject_name || 'Ismeretlen tárgy',
+                        teacherName: effectiveEntry.teacher_name || '',
+                        classroom: effectiveEntry.classroom || '',
+                        className: effectiveEntry.class_name,
                     }}
-                    showTeacher={entry.week_type === 'all' || span > 1}
-                    showRoom={entry.week_type === 'all' || span > 1}
-                    showClassName={entry.class_id !== selectedClass?.id}
+                    showTeacher={effectiveEntry.week_type === 'all' || span > 1}
+                    showRoom={effectiveEntry.week_type === 'all' || span > 1}
+                    showClassName={effectiveEntry.class_id !== selectedClass?.id}
                     variant="compact"
+                    isCustom={isCustom}
+                    className={`${isEntryMatch(effectiveEntry) ? 'search-match' : ''} ${effectiveEntry.week_type !== 'all' ? 'half-card' : ''}`}
                 />
                 <button
                     className="half-slot-delete-btn"
                     onClick={(e) => {
                         e.stopPropagation();
-                        deleteEntry(dayIndex, startSlot, entry.id);
+                        deleteEntry(dayIndex, startSlot, effectiveEntry.id);
                     }}
                     title="Törlés"
                 >
@@ -774,7 +841,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         </div>
     );
 
-    const renderCellContent = (dayIndex: number, slotIndex: number, selectedEntries: AvailableClassEntry[], hasOptions: boolean) => {
+    const renderCellContent = (dayIndex: number, slotIndex: number, selectedEntries: AvailableClassEntry[], hasOptions: boolean, isSearchMatch: boolean) => {
         const oddEntry = selectedEntries.find(e => e.week_type === 'odd');
         const evenEntry = selectedEntries.find(e => e.week_type === 'even');
         const fullEntry = selectedEntries.find(e => e.week_type === 'all');
@@ -937,67 +1004,6 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     {isMobile ? (
                         // Mobile Carousel (Single Day at a time)
                         <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
-                            {/* Static Controls (Search & Toggle) - Placed at the bottom */}
-                            <div className="mobile-planner-controls glass-card" style={{
-                                position: 'absolute',
-                                bottom: '32px',
-                                top: 'auto',
-                                left: '0',
-                                right: '0',
-                                zIndex: 10,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                padding: '8px 12px',
-                                gap: '8px',
-                                borderRadius: '12px',
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--border)',
-                            }}>
-                                <span style={{
-                                    fontSize: '0.7rem',
-                                    color: 'var(--text-secondary)',
-                                    opacity: 0.8,
-                                    textAlign: 'center'
-                                }}>
-                                    💡 A tervező használata számítógépen kényelmesebb
-                                </span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
-                                    <input
-                                        type="text"
-                                        placeholder="Keresés..."
-                                        value={classTypeSearch}
-                                        onChange={(e) => onClassTypeSearchChange?.(e.target.value)}
-                                        style={{
-                                            flex: 1,
-                                            padding: '6px 12px',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border)',
-                                            background: 'var(--bg-secondary)',
-                                            color: 'var(--text-primary)',
-                                            fontSize: '0.8rem',
-                                            minWidth: 0,
-                                        }}
-                                    />
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        fontSize: '0.8rem',
-                                        color: 'var(--text-primary)',
-                                        fontWeight: 500,
-                                        whiteSpace: 'nowrap'
-                                    }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={includeCrossMajor}
-                                            onChange={(e) => onIncludeCrossMajorChange(e.target.checked)}
-                                            style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
-                                        />
-                                        Bővített
-                                    </label>
-                                </div>
-                            </div>
                             <AnimatePresence initial={false} custom={direction} mode="popLayout">
                                 <motion.div
                                     key={currentDayIndex}
@@ -1035,7 +1041,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                         <div className="planner-column-header">
                                             {DAYS[currentDayIndex]} {currentDayIndex === today && '(Ma)'}
                                         </div>
-                                        <div className="planner-slots-stack" style={{ paddingBottom: '80px' }}>
+                                        <div className="planner-slots-stack">
                                             {TIME_SLOTS.map((slot, slotIndex) => {
                                                 const cellKey = `${currentDayIndex}-${slotIndex}`;
                                                 const selectedEntries = getSelectedEntries(currentDayIndex, slotIndex);
@@ -1057,12 +1063,12 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                             ref={(el) => {
                                                                 if (el) cellRefs.current.set(cellKey, el);
                                                             }}
-                                                            className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
+                                                            className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${(isSearchMatch && !hasSelection && !isCovered) ? 'search-match' : ''}`}
                                                             style={{
                                                                 background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
                                                                 borderColor: isActive && !hasSelection && !isCovered
                                                                     ? 'var(--accent)'
-                                                                    : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
+                                                                    : undefined,
                                                                 display: 'flex',
                                                                 flexDirection: 'column',
                                                                 gap: 0,
@@ -1074,11 +1080,67 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                                 }
                                                             }}
                                                         >
-                                                            {renderCellContent(currentDayIndex, slotIndex, selectedEntries, hasOptions)}
+                                                            {renderCellContent(currentDayIndex, slotIndex, selectedEntries, hasOptions, isSearchMatch)}
                                                         </div>
                                                     </div>
                                                 );
                                             })}
+                                        </div>
+                                        {/* Search & toggle controls at bottom */}
+                                        <div style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '2px',
+                                            padding: '4px 0 0 0',
+                                        }}>
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                            }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Keresés..."
+                                                    value={classTypeSearch}
+                                                    onChange={(e) => onClassTypeSearchChange?.(e.target.value)}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 10px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid var(--border)',
+                                                        background: 'var(--bg-secondary)',
+                                                        color: 'var(--text-primary)',
+                                                        fontSize: '0.75rem',
+                                                        minWidth: 0,
+                                                    }}
+                                                />
+                                                <label style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    fontSize: '0.7rem',
+                                                    color: 'var(--text-primary)',
+                                                    fontWeight: 500,
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={includeCrossMajor}
+                                                        onChange={(e) => onIncludeCrossMajorChange(e.target.checked)}
+                                                        style={{ width: '14px', height: '14px', accentColor: 'var(--accent)' }}
+                                                    />
+                                                    Bővített
+                                                </label>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <span style={{
+                                                    fontSize: '0.6rem',
+                                                    color: 'var(--text-secondary)',
+                                                    opacity: 0.6,
+                                                }}>
+                                                    🖥 Asztali nézetben kényelmesebb
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -1111,12 +1173,12 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             ref={(el) => {
                                                 if (el) cellRefs.current.set(cellKey, el);
                                             }}
-                                            className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${isSearchMatch ? 'search-match' : ''}`}
+                                            className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${(isSearchMatch && !hasSelection && !isCovered) ? 'search-match' : ''}`}
                                             style={{
                                                 background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
                                                 borderColor: isActive && !hasSelection && !isCovered
                                                     ? 'var(--accent)'
-                                                    : (isSearchMatch ? 'rgba(220, 224, 235, 0.85)' : 'transparent'),
+                                                    : undefined,
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 gap: 0,
@@ -1128,7 +1190,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                 }
                                             }}
                                         >
-                                            {renderCellContent(dayIndex, slotIndex, selectedEntries, hasOptions)}
+                                            {renderCellContent(dayIndex, slotIndex, selectedEntries, hasOptions, isSearchMatch)}
                                         </div>
                                     );
                                 })}
@@ -1143,6 +1205,8 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         onClick={() => {
                             setActiveSlot(null);
                             setActiveHalf(null);
+                            setDropdownPos(null);
+                            setModifyingEntry(null);
                         }}
                     />
                 )}
@@ -1157,6 +1221,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                 top: dropdownPos.top,
                                 bottom: dropdownPos.bottom,
                                 width: dropdownPos.width,
+                                maxHeight: dropdownPos.maxHeight,
                             }}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1165,14 +1230,103 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         >
                             <AnimatedList
                                 items={[
-                                    ...dropdownOptions.map((item) => {
-                                        if ('isDivider' in item) {
-                                            return (
-                                                <div key={item.id} className="dropdown-divider">
-                                                    <span>Replace with</span>
+                                    // Settings/Modify button at top when there's a selected entry
+                                    ...(activeSlot && hasSelectedInActiveSlot ? [
+                                        modifyingEntry ? (
+                                            <div key="modify-panel" className="planner-modify-panel" onClick={(e) => e.stopPropagation()}>
+                                                <div className="modify-panel-header">
+                                                    <span>⚙️ {modifyingEntry.subject_name}</span>
+                                                    <button className="modify-panel-close" onClick={() => setModifyingEntry(null)}>✕</button>
                                                 </div>
-                                            );
-                                        }
+                                                <div className="modify-panel-body">
+                                                    <div className="modify-panel-label">Hét típusa:</div>
+                                                    <div className="modify-panel-options">
+                                                        {(['all', 'odd', 'even'] as const).map(wt => {
+                                                            const currentWt = customEntries[modifyingEntry.id]?.week_type || modifyingEntry.week_type;
+                                                            const labels: Record<string, string> = { all: 'Minden hét', odd: 'Páratlan', even: 'Páros' };
+                                                            return (
+                                                                <button
+                                                                    key={wt}
+                                                                    className={`modify-wt-btn ${currentWt === wt ? 'active' : ''}`}
+                                                                    onClick={() => {
+                                                                        if (wt === modifyingEntry.week_type) {
+                                                                            // Reset to original
+                                                                            removeCustomEntry(modifyingEntry.id);
+                                                                        } else {
+                                                                            setCustomEntry(modifyingEntry.id, { week_type: wt });
+                                                                        }
+
+                                                                        // Collision detection: Automatically remove other entries in the same sub-slot
+                                                                        if (activeSlot) {
+                                                                            const key = `${activeSlot.day}-${activeSlot.slot}`;
+                                                                            const currentSelections = selectedSlots.get(key) || [];
+                                                                            
+                                                                            const newSelections = currentSelections.filter(e => {
+                                                                                if (e.id === modifyingEntry.id) return true;
+                                                                                if (wt === 'all') return false;
+                                                                                const otherWt = customEntries[e.id]?.week_type || e.week_type;
+                                                                                if (otherWt === 'all') return false;
+                                                                                if (otherWt === wt) return false;
+                                                                                return true;
+                                                                            });
+
+                                                                            if (newSelections.length !== currentSelections.length) {
+                                                                                const newMap = new Map(selectedSlots);
+                                                                                newMap.set(key, newSelections);
+                                                                                setSelectedSlots(newMap);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {labels[wt]}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="modify-panel-actions">
+                                                        {customEntries[modifyingEntry.id] && (
+                                                            <button
+                                                                className="modify-reset-btn"
+                                                                onClick={() => {
+                                                                    removeCustomEntry(modifyingEntry.id);
+                                                                    setModifyingEntry(null);
+                                                                }}
+                                                            >
+                                                                ↩ Eredeti visszaállítása
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <GlareHover
+                                                key="settings-btn"
+                                                className="planner-settings-btn"
+                                                onClick={(e) => {
+                                                    // @ts-ignore
+                                                    e.stopPropagation();
+                                                    const entries = getSelectedEntries(activeSlot!.day, activeSlot!.slot);
+                                                    if (entries.length > 0) {
+                                                        setModifyingEntry(entries[0]);
+                                                    }
+                                                }}
+                                                glareColor="#ffffff"
+                                                glareOpacity={0.2}
+                                                glareSize={150}
+                                                height="auto"
+                                                borderRadius="8px"
+                                                borderColor="var(--border)"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="12" cy="12" r="3" />
+                                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                                </svg>
+                                                <span>Módosítás</span>
+                                            </GlareHover>
+                                        )
+                                    ] : []),
+                                    ...dropdownOptions.map((item) => {
+                                        if ('isDivider' in item) return null;
                                         const entry = item as AvailableClassEntry;
                                         return (
                                             <div key={entry.id} style={{ position: 'relative' }}>
@@ -1183,13 +1337,14 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                         teacherName: entry.teacher_name || '',
                                                         classroom: entry.classroom || '',
                                                         className: entry.class_name,
-                                                        weekType: entry.week_type as 'all' | 'odd' | 'even',
+                                                        weekType: (customEntries[entry.id]?.week_type || entry.week_type) as 'all' | 'odd' | 'even',
                                                     }}
                                                     showTeacher={true}
                                                     showRoom={true}
                                                     showClassName={true}
                                                     variant="dropdown"
                                                     enableGlare={true}
+                                                    isCustom={!!customEntries[entry.id]}
                                                 />
                                                 {entry.shared_classes && entry.shared_classes.length > 1 && (
                                                     <button
@@ -1218,7 +1373,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             glareSize={200}
                                             transitionDuration={600}
                                             playOnce={false}
-                                            className="dropdown-clear-btn"
+                                            className="dropdown-delete-btn"
                                             onClick={() => {
                                                 selectClass(null);
                                             }}
@@ -1233,15 +1388,18 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                     ] : [])
                                 ]}
                                 onItemSelect={(index) => {
-                                    if (index < dropdownOptions.length) {
-                                        const item = dropdownOptions[index];
+                                    // Offset by settings button if present
+                                    const hasSettingsBtn = hasSelectedInActiveSlot ? 1 : 0;
+                                    const adjustedIndex = index - hasSettingsBtn;
+                                    if (adjustedIndex >= 0 && adjustedIndex < dropdownOptions.length) {
+                                        const item = dropdownOptions[adjustedIndex];
                                         if ('isDivider' in item) return;
                                         selectClass(item as AvailableClassEntry);
-                                    } else {
+                                    } else if (adjustedIndex >= dropdownOptions.length) {
                                         selectClass(null);
                                     }
                                 }}
-                                showGradients={dropdownOptions.length > 3}
+                                showGradients={false}
                                 enableArrowNavigation={true}
                                 displayScrollbar={false}
                             />

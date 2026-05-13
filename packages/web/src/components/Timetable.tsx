@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { fetchTimetableEntries, fetchTimetableEntriesByIds } from '@shared/index';
+import { fetchTimetableEntries, fetchTimetableEntriesByIds, fetchTeacherTimetable } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
 import type { TimetableEntry } from '@shared/lib/types';
 import ClassCard from './ClassCard';
@@ -42,7 +42,7 @@ function getMinutes(timeStr: string): number {
 }
 
 export default function Timetable() {
-    const { selectedClass, timetableEntries, setTimetableEntries, userSelections, isLoading, preferences } = useAppStore();
+    const { selectedClass, selectedTeacher, timetableEntries, setTimetableEntries, userSelections, isLoading, preferences } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
     const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -82,8 +82,10 @@ export default function Timetable() {
     useEffect(() => {
         if (selectedClass?.id) {
             fetchTimetableEntries(selectedClass.id).then(setTimetableEntries);
+        } else if (selectedTeacher?.id) {
+            fetchTeacherTimetable(selectedTeacher.id).then(setTimetableEntries);
         }
-    }, [selectedClass?.id]);
+    }, [selectedClass?.id, selectedTeacher?.id]);
 
     // Fetch user-selected entries when there are selections
     useEffect(() => {
@@ -176,10 +178,10 @@ export default function Timetable() {
         );
     }
 
-    if (!selectedClass) {
+    if (!selectedClass && !selectedTeacher) {
         return (
             <div className="loading-container">
-                <span>Válassz osztályt a beállításokban</span>
+                <span>Válassz osztályt vagy tanárt a beállításokban</span>
             </div>
         );
     }
@@ -373,7 +375,7 @@ export default function Timetable() {
                         position: 'absolute',
                         left: 0,
                         right: 0,
-                        height: '100%',
+                        height: 'calc(100% - 16px)',
                         padding: '0 12px' // Increased padding for a better gutter
                     }}
                 >
@@ -508,9 +510,34 @@ export default function Timetable() {
 function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
     const getPosition = () => {
         const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-        const start = 480; // 08:00
-        const range = 720; // 12 hours
-        return Math.min(100, Math.max(0, ((minutes - start) / range) * 100));
+        const slotCount = TIME_SLOTS.length;
+
+        for (let i = 0; i < slotCount; i++) {
+            const slot = TIME_SLOTS[i];
+            const start = getMinutes(slot.start);
+            const end = getMinutes(slot.end);
+
+            // Inside a specific slot
+            if (minutes >= start && minutes <= end) {
+                const slotProgress = (minutes - start) / (end - start);
+                return ((i + slotProgress) / slotCount) * 100;
+            }
+
+            // In the gap between this slot and the next
+            if (i < slotCount - 1) {
+                const nextSlot = TIME_SLOTS[i + 1];
+                const nextStart = getMinutes(nextSlot.start);
+                if (minutes > end && minutes < nextStart) {
+                    // Place marker on the line between slots
+                    return ((i + 1) / slotCount) * 100;
+                }
+            }
+        }
+
+        // Before first class
+        if (minutes < getMinutes(TIME_SLOTS[0].start)) return 0;
+        // After last class
+        return 100;
     };
 
     const [currentPos, setCurrentPos] = useState(getPosition());

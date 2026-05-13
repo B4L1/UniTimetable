@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS classes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Teachers list for onboarding
+CREATE TABLE IF NOT EXISTS teachers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL UNIQUE,
+  edupage_id TEXT UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Timetable entries from scraper
 CREATE TABLE IF NOT EXISTS timetable_entries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -59,6 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_user_selections_user ON user_selections(user_id);
 -- Enable Row Level Security (RLS)
 ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timetable_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_selections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 
@@ -67,6 +76,9 @@ CREATE POLICY "Classes are viewable by everyone" ON classes
   FOR SELECT USING (true);
 
 CREATE POLICY "Timetable entries are viewable by everyone" ON timetable_entries
+  FOR SELECT USING (true);
+
+CREATE POLICY "Teachers are viewable by everyone" ON teachers
   FOR SELECT USING (true);
 
 -- Policies: Allow users to manage their own selections and preferences

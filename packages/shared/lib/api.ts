@@ -2,9 +2,9 @@
 
 import { supabase } from './supabase';
 import { storage } from './storage';
-import { ClassData, TimetableEntry } from './types';
+import { ClassData, TimetableEntry, Teacher } from './types';
 
-export type { ClassData, TimetableEntry };
+export type { ClassData, TimetableEntry, Teacher };
 
 export interface AvailableClassEntry extends TimetableEntry {
     class_name?: string;
@@ -356,6 +356,155 @@ export async function searchTimetableEntriesBySubject(query: string): Promise<Av
 
     } catch (err) {
         console.error('Failed to search subjects:', err);
+        return [];
+    }
+}
+
+/**
+ * Fetch user preferences from Supabase
+ */
+export async function fetchUserPreferences(userId: string): Promise<any | null> {
+    try {
+        const { data, error } = await supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is 'not found'
+            console.error('Error fetching user preferences:', error.message);
+            return null;
+        }
+
+        return data;
+    } catch (err) {
+        console.error('Failed to fetch user preferences:', err);
+        return null;
+    }
+}
+
+/**
+ * Upsert user preferences to Supabase
+ */
+export async function upsertUserPreferences(userId: string, data: any): Promise<void> {
+    try {
+        const { error } = await supabase
+            .from('user_preferences')
+            .upsert({
+                user_id: userId,
+                ...data,
+                updated_at: new Date().toISOString(),
+            });
+
+        if (error) {
+            console.error('Error upserting user preferences:', error.message);
+        }
+    } catch (err) {
+        console.error('Failed to upsert user preferences:', err);
+    }
+}
+
+/**
+ * Fetch user selections (custom timetable) from Supabase
+ */
+export async function fetchUserSelections(userId: string): Promise<string[]> {
+    try {
+        const { data, error } = await supabase
+            .from('user_selections')
+            .select('entry_id')
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error('Error fetching user selections:', error.message);
+            return [];
+        }
+
+        return data.map(d => d.entry_id) || [];
+    } catch (err) {
+        console.error('Failed to fetch user selections:', err);
+        return [];
+    }
+}
+
+/**
+ * Update user selections (custom timetable) in Supabase
+ * This replaces the previous selections with the new ones.
+ */
+export async function updateUserSelections(userId: string, entryIds: string[]): Promise<void> {
+    try {
+        // 1. Delete existing selections
+        const { error: deleteError } = await supabase
+            .from('user_selections')
+            .delete()
+            .eq('user_id', userId);
+
+        if (deleteError) {
+            console.error('Error deleting old user selections:', deleteError.message);
+            return;
+        }
+
+        if (entryIds.length === 0) return;
+
+        // 2. Insert new selections
+        const inserts = entryIds.map(entryId => ({
+            user_id: userId,
+            entry_id: entryId,
+        }));
+
+        const { error: insertError } = await supabase
+            .from('user_selections')
+            .insert(inserts);
+
+        if (insertError) {
+            console.error('Error inserting new user selections:', insertError.message);
+        }
+    } catch (err) {
+        console.error('Failed to update user selections:', err);
+    }
+}
+
+/**
+ * Fetch all teachers from Supabase
+ */
+export async function fetchTeachers(): Promise<Teacher[]> {
+    try {
+        const { data, error } = await supabase
+            .from('teachers')
+            .select('*')
+            .order('name');
+
+        if (error) {
+            console.error('Error fetching teachers:', error.message);
+            return [];
+        }
+
+        return data || [];
+    } catch (err) {
+        console.error('Failed to fetch teachers:', err);
+        return [];
+    }
+}
+
+/**
+ * Fetch timetable entries for a specific teacher
+ */
+export async function fetchTeacherTimetable(teacherId: string): Promise<TimetableEntry[]> {
+    try {
+        const { data, error } = await supabase
+            .from('timetable_entries')
+            .select('*')
+            .eq('teacher_id', teacherId)
+            .order('day_of_week')
+            .order('start_time');
+
+        if (error) {
+            console.error('Error fetching teacher timetable:', error.message);
+            return [];
+        }
+
+        return data || [];
+    } catch (err) {
+        console.error('Failed to fetch teacher timetable:', err);
         return [];
     }
 }

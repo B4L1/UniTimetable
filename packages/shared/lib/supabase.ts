@@ -81,9 +81,12 @@ export type Database = {
                     day_of_week: number;
                     start_time: string;
                     end_time: string;
-                    week_type: 'all' | 'odd' | 'even';
+                    week_type: string | null;
                     color: string | null;
+                    edupage_id: string | null;
                     scraped_at: string;
+                    teacher_id: string | null;
+                    class_names: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['timetable_entries']['Row'], 'id' | 'scraped_at'>;
                 Update: Partial<Database['public']['Tables']['timetable_entries']['Insert']>;
@@ -109,6 +112,16 @@ export type Database = {
                 };
                 Insert: Omit<Database['public']['Tables']['user_preferences']['Row'], 'updated_at'>;
                 Update: Partial<Database['public']['Tables']['user_preferences']['Insert']>;
+            };
+            teachers: {
+                Row: {
+                    id: string;
+                    name: string;
+                    edupage_id: string | null;
+                    created_at: string;
+                };
+                Insert: Omit<Database['public']['Tables']['teachers']['Row'], 'id' | 'created_at'>;
+                Update: Partial<Database['public']['Tables']['teachers']['Insert']>;
             };
         };
     };

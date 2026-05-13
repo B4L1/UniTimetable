@@ -3,11 +3,9 @@
 .class-card {
     height: 100%;
     padding: 10px 16px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     box-sizing: border-box;
@@ -111,7 +109,7 @@
     color: rgba(255, 255, 255, 0.6);
     background: rgba(0, 0, 0, 0.2);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
 }
 
 /* ============================================ */
@@ -139,6 +137,44 @@
 
 .class-card--compact .class-card-footer {
     padding-top: 4px;
+}
+
+@media (max-width: 768px) {
+    .class-card--compact {
+        padding: 4px 8px;
+    }
+
+    /* Only half-cards get row layout */
+    .class-card--compact.half-card .class-card-content {
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .class-card--compact.half-card .class-card-subject {
+        font-size: 0.65rem;
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .class-card--compact.half-card .class-card-teacher {
+        display: none;
+    }
+
+    .class-card--compact.half-card .class-card-footer {
+        padding-top: 0;
+        margin-top: 0;
+        flex-shrink: 0;
+    }
+
+    .class-card--compact.half-card .class-card-room {
+        font-size: 0.6rem;
+    }
+
+    .class-card--compact.half-card .class-card-classname {
+        font-size: 0.55rem;
+    }
 }
 
 /* ============================================ */
@@ -180,4 +216,90 @@
     z-index: -1;
     pointer-events: none;
     border-radius: inherit;
+}
+
+/* ============================================ */
+/* Search highlighting */
+/* ============================================ */
+.class-card.search-match {
+    border-color: rgba(255, 255, 255, 0.7) !important;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.class-card.search-match:hover {
+    border-color: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+[data-theme='sapientia'] .class-card.search-match {
+    border-color: var(--sap-green-light, #8bc34a) !important;
+    box-shadow: 0 0 8px rgba(139, 195, 74, 0.3), inset 0 0 0 1px rgba(139, 195, 74, 0.3);
+}
+
+[data-theme='sapientia'] .class-card.search-match:hover {
+    border-color: var(--sap-green-light, #8bc34a) !important;
+    box-shadow: 0 0 18px rgba(139, 195, 74, 0.45), inset 0 0 0 1px rgba(139, 195, 74, 0.5);
+}
+
+/* ============================================ */
+/* User-Customized Card Indicator */
+/* ============================================ */
+
+/* For half cards (odd/even), we add a striped gap across the diagonal split */
+.class-card--dropdown.is-odd-week.is-custom::before {
+    background: linear-gradient(-45deg, 
+        rgba(30, 30, 42, 0.95) 43%, 
+        var(--subject-color) 43%, var(--subject-color) 46%, 
+        rgba(30, 30, 42, 0.95) 46%, rgba(30, 30, 42, 0.95) 50%, 
+        transparent 50%
+    );
+}
+
+.class-card--dropdown.is-even-week.is-custom::before {
+    background: linear-gradient(-45deg, 
+        transparent 50%, 
+        rgba(30, 30, 42, 0.95) 50%, rgba(30, 30, 42, 0.95) 54%, 
+        var(--subject-color) 54%, var(--subject-color) 57%, 
+        rgba(30, 30, 42, 0.95) 57%
+    );
+}
+
+/* For full cards (all weeks), we add a single diagonal dark stripe */
+.class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
+    content: "";
+    position: absolute; top:0; left:0; right:0; bottom:0;
+    pointer-events: none; border-radius: inherit; z-index: -1;
+    background: linear-gradient(-45deg,
+        transparent 47%,
+        rgba(30, 30, 42, 0.95) 47%, rgba(30, 30, 42, 0.95) 51%,
+        transparent 51%
+    );
+}
+
+/* Faulty terminal overrides for customized indicators */
+[data-theme='faulty-terminal'] .class-card--dropdown.is-odd-week.is-custom::before {
+    background: linear-gradient(-45deg, 
+        var(--bg-primary, #050505) 43%, 
+        var(--subject-color) 43%, var(--subject-color) 46%, 
+        var(--bg-primary, #050505) 46%, var(--bg-primary, #050505) 50%, 
+        transparent 50%
+    );
+}
+
+[data-theme='faulty-terminal'] .class-card--dropdown.is-even-week.is-custom::before {
+    background: linear-gradient(-45deg, 
+        transparent 50%, 
+        var(--bg-primary, #050505) 50%, var(--bg-primary, #050505) 54%, 
+        var(--subject-color) 54%, var(--subject-color) 57%, 
+        var(--bg-primary, #050505) 57%
+    );
+}
+
+[data-theme='faulty-terminal'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
+    background: linear-gradient(-45deg,
+        transparent 47%,
+        var(--bg-primary, #050505) 47%, var(--bg-primary, #050505) 51%,
+        transparent 51%
+    );
 }
