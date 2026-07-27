@@ -13,7 +13,7 @@
     z-index: 50;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0s linear 0.1s;
+    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), z-index 0s linear 0.1s;
 }
 
 .class-card:hover {
@@ -21,24 +21,52 @@
     transition-delay: 0s;
 }
 
-/* Content wrapper */
+/* Microinteractions (spec §8.2): subtle scale on hover, compress on press.
+   Only the timetable (default) variant — planner cards have their own
+   affordances. */
+.class-card--default:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-md);
+}
+
+.class-card--default:active {
+    transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .class-card {
+        transition: none;
+    }
+
+    .class-card--default:hover,
+    .class-card--default:active {
+        transform: none;
+    }
+}
+
+/* Content wrapper — truncate, never scroll (spec §2.1/§7.4); the title
+   tooltip carries the full text */
 .class-card-content {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: hidden;
     touch-action: pan-y;
-    /* Allow scrolling if content is too long */
-    scrollbar-width: none;
-    /* Hide scrollbar Firefox */
-    -ms-overflow-style: none;
-    /* Hide scrollbar IE/Edge */
 }
 
-.class-card-content::-webkit-scrollbar {
-    display: none;
-    /* Hide scrollbar Chrome/Safari/Brave */
+.class-card--default .class-card-subject {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.class-card--default .class-card-teacher,
+.class-card--default .class-card-room {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Prevent mobile swiping issues from overflow-y */
@@ -58,12 +86,12 @@
     margin-bottom: 4px;
 }
 
-[data-theme='faulty-terminal'] .class-card {
+[data-theme='terminal'] .class-card {
     position: relative;
     overflow: hidden;
 }
 
-[data-theme='faulty-terminal'] .class-card::after {
+[data-theme='terminal'] .class-card::after {
     content: "";
     position: absolute;
     top: 0;
@@ -199,7 +227,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(-45deg, rgba(30, 30, 42, 0.95) 50%, transparent 50.1%);
+    background: linear-gradient(-45deg, var(--bg-surface, rgba(30, 30, 42, 0.95)) 50%, transparent 50.1%);
     z-index: -1;
     pointer-events: none;
     border-radius: inherit;
@@ -212,7 +240,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(-45deg, transparent 49.9%, rgba(30, 30, 42, 0.95) 50%);
+    background: linear-gradient(-45deg, transparent 49.9%, var(--bg-surface, rgba(30, 30, 42, 0.95)) 50%);
     z-index: -1;
     pointer-events: none;
     border-radius: inherit;
@@ -224,7 +252,7 @@
 .class-card.search-match {
     border-color: rgba(255, 255, 255, 0.7) !important;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: box-shadow var(--transition), border-color var(--transition);
 }
 
 .class-card.search-match:hover {
@@ -232,12 +260,12 @@
     box-shadow: 0 0 18px rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
-[data-theme='sapientia'] .class-card.search-match {
+[data-theme='light'] .class-card.search-match {
     border-color: var(--sap-green-light, #8bc34a) !important;
     box-shadow: 0 0 8px rgba(139, 195, 74, 0.3), inset 0 0 0 1px rgba(139, 195, 74, 0.3);
 }
 
-[data-theme='sapientia'] .class-card.search-match:hover {
+[data-theme='light'] .class-card.search-match:hover {
     border-color: var(--sap-green-light, #8bc34a) !important;
     box-shadow: 0 0 18px rgba(139, 195, 74, 0.45), inset 0 0 0 1px rgba(139, 195, 74, 0.5);
 }
@@ -278,7 +306,7 @@
 }
 
 /* Faulty terminal overrides for customized indicators */
-[data-theme='faulty-terminal'] .class-card--dropdown.is-odd-week.is-custom::before {
+[data-theme='terminal'] .class-card--dropdown.is-odd-week.is-custom::before {
     background: linear-gradient(-45deg, 
         var(--bg-primary, #050505) 43%, 
         var(--subject-color) 43%, var(--subject-color) 46%, 
@@ -287,7 +315,7 @@
     );
 }
 
-[data-theme='faulty-terminal'] .class-card--dropdown.is-even-week.is-custom::before {
+[data-theme='terminal'] .class-card--dropdown.is-even-week.is-custom::before {
     background: linear-gradient(-45deg, 
         transparent 50%, 
         var(--bg-primary, #050505) 50%, var(--bg-primary, #050505) 54%, 
@@ -296,7 +324,7 @@
     );
 }
 
-[data-theme='faulty-terminal'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
+[data-theme='terminal'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
     background: linear-gradient(-45deg,
         transparent 47%,
         var(--bg-primary, #050505) 47%, var(--bg-primary, #050505) 51%,

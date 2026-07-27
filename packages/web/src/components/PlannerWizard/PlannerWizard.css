@@ -1,0 +1,778 @@
+/* Planner stepper (Phase 4) — semantic tokens only, B10 rules:
+   hairline borders for structure, shadows only for elevation,
+   every interactive element has default/hover/active/focus-visible/disabled.
+   Rendered as a MODAL over the timetable — glass belongs on modals (§A5). */
+
+.wizard-backdrop {
+  /* viewport-relative modal size: same share of the screen whether it's a
+     dense high-res panel or a big low-res one. Clamps only stop the extremes
+     (unreadably wide on ultrawides, unusably small in tiny windows). */
+  --wizard-modal-w: clamp(560px, 70vw, 1080px);
+  --wizard-modal-h: clamp(520px, 86vh, 960px);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.wizard-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(var(--wizard-modal-w), calc(100vw - 2 * var(--space-5)));
+  /* fixed height per viewport: the modal never resizes with its content —
+     overflowing steps scroll inside the body instead */
+  height: min(var(--wizard-modal-h), calc(100vh - 2 * var(--space-5)));
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.wizard-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.wizard-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* the step wrapper scrolls, not the body */
+  padding: var(--space-4);
+}
+/* each step fills the body; tall steps scroll internally, the edit step's
+   grid flexes to fill so its Save row stays on-screen at any height */
+.wizard-step-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.wizard-close {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.wizard-close:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.wizard-close:active { transform: scale(0.94); }
+.wizard-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* loading skeleton: pulsing mini-timetable */
+.wizard-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) 0;
+}
+.wizard-loader-grid {
+  display: flex;
+  gap: var(--space-2);
+  height: 120px;
+  width: 240px;
+}
+.wizard-loader-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.wizard-loader-block {
+  display: block;
+  border-radius: var(--radius-xs);
+  background: var(--accent-subtle);
+  animation: wizard-pulse 1.2s ease-in-out infinite;
+}
+@keyframes wizard-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleY(0.92); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+.wizard-loader-label { font-size: 13px; color: var(--text-tertiary); }
+
+/* --- step indicator ------------------------------------------------------ */
+
+.wizard-steps {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.wizard-step-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.wizard-step-chip:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
+.wizard-step-chip:active:not(:disabled) { transform: scale(0.98); }
+.wizard-step-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wizard-step-chip:disabled { opacity: 0.45; cursor: default; }
+.wizard-step-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+}
+.wizard-step-chip.done .wizard-step-num { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.wizard-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- panels --------------------------------------------------------------- */
+
+/* panels live inside the modal body — the modal provides the chrome.
+   Natural height + no shrink so tall steps scroll the wrapper instead of
+   squashing; the edit panel overrides this to fill (below). */
+.wizard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+.wizard-panel h2 { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+.wizard-panel h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+.wizard-hint { font-size: 14px; color: var(--text-secondary); }
+.wizard-warning { font-size: 13px; color: var(--warning, #eab308); }
+.wizard-loading { font-size: 13px; color: var(--text-tertiary); }
+.wizard-empty { font-size: 14px; color: var(--text-tertiary); list-style: none; }
+
+.wizard-subsection { display: flex; flex-direction: column; gap: var(--space-3); }
+.wizard-row { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+
+.wizard-btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+.wizard-btn-secondary:hover:not(:disabled) { border-color: var(--border-strong); }
+.wizard-btn-secondary:active:not(:disabled) { transform: scale(0.98); }
+.wizard-btn-secondary:disabled { opacity: 0.5; cursor: default; }
+.wizard-btn-small { padding: var(--space-1) var(--space-3); font-size: 13px; }
+
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* --- profile step ---------------------------------------------------------- */
+
+.wizard-profile-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+.wizard-avatar { width: 48px; height: 48px; border-radius: 50%; }
+.wizard-profile-info { display: flex; flex-direction: column; gap: var(--space-1); }
+.wizard-profile-name { font-weight: 600; color: var(--text-primary); }
+.wizard-profile-meta { font-size: 13px; color: var(--text-tertiary); }
+.wizard-profile-class { font-size: 14px; color: var(--text-secondary); }
+
+/* --- courses step ----------------------------------------------------------- */
+
+.wizard-course-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+}
+
+.wizard-course {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: opacity var(--transition), border-color var(--transition);
+}
+.wizard-course.off { opacity: 0.5; }
+.wizard-course:hover { border-color: var(--border-strong); }
+
+.wizard-course-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wizard-course-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wizard-course-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.wizard-course-meta { font-size: 12px; color: var(--text-tertiary); }
+
+.wizard-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+}
+.wizard-tag-removable button {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  line-height: 1;
+}
+
+.wizard-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.wizard-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.wizard-chip:hover { border-color: var(--border-strong); }
+.wizard-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.wizard-chip:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* on/off switch */
+.wizard-switch {
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  padding: 1px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}
+.wizard-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wizard-switch-knob {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: transform var(--transition), background var(--transition);
+}
+.wizard-switch.on { background: var(--accent); border-color: var(--accent); }
+.wizard-switch.on .wizard-switch-knob { transform: translateX(16px); background: #fff; }
+
+.wizard-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.wizard-checkbox input { accent-color: var(--accent); }
+
+.wizard-input {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: border-color var(--transition);
+}
+.wizard-input:hover { border-color: var(--border-strong); }
+.wizard-input:focus { border-color: var(--accent); outline: none; }
+
+.wizard-search-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.wizard-search-results li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.wizard-imported { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* --- preferences step ------------------------------------------------------ */
+
+.wizard-days { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+.wizard-day-chip {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.wizard-day-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.wizard-day-chip:hover { border-color: var(--border-strong); }
+.wizard-day-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+}
+.wizard-day-chip:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wizard-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.wizard-slider-row {
+  display: grid;
+  grid-template-columns: 1fr 180px 40px;
+  align-items: center;
+  gap: var(--space-4);
+}
+.wizard-slider-text { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--text-primary); }
+.wizard-slider-row input[type='range'] { accent-color: var(--accent); }
+.wizard-slider-row input[type='range']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wizard-slider-value { font-size: 13px; color: var(--text-secondary); text-align: right; }
+
+/* --- generate step ---------------------------------------------------------- */
+
+.wizard-issue {
+  border: 1px solid var(--warning, #eab308);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.wizard-schedules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
+
+.wizard-schedule-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  /* no transform on hover — scaling a bordered card renders blurry,
+     half-clipped hairlines (B10: borders define structure, not motion) */
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.wizard-schedule-card.best { border-color: var(--accent); }
+.wizard-schedule-card header { display: flex; align-items: center; gap: var(--space-2); }
+.wizard-schedule-rank { font-weight: 600; color: var(--text-primary); }
+.wizard-schedule-explanation { font-size: 13px; color: var(--text-secondary); flex: 1; }
+
+/* whole card is the select target */
+.wizard-schedule-card.clickable { cursor: pointer; outline: none; }
+.wizard-schedule-card.clickable:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+}
+.wizard-schedule-card.clickable:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.wizard-schedule-pick {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity var(--transition), transform var(--transition);
+}
+.wizard-schedule-card.clickable:hover .wizard-schedule-pick,
+.wizard-schedule-card.clickable:focus-visible .wizard-schedule-pick {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* mini preview */
+.wizard-minigrid {
+  display: grid;
+  gap: var(--space-1);
+  height: 132px;
+}
+.wizard-minigrid-day { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wizard-minigrid-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.wizard-minigrid-col {
+  position: relative;
+  flex: 1;
+  background: var(--bg-app, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+.wizard-minigrid-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 2px;
+  opacity: 0.9;
+}
+.wizard-minigrid-block.parity-odd { right: 50%; }
+.wizard-minigrid-block.parity-even { left: 50%; }
+
+/* --- edit step: slot-based schedule grid (Phase 5, planner-style) ------------- */
+
+.sg-slots {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden; /* the whole week fits — no scroll */
+}
+.sg-corner,
+.sg-col-head {
+  background: var(--bg-surface);
+}
+.sg-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 4px;
+}
+.sg-time {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.sg-cell {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-app, transparent);
+}
+
+/* ghost drop target fills the whole cell */
+.sg-ghost {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed;
+  pointer-events: none; /* hit-tested by rect; never intercepts the drag */
+  z-index: 6;
+}
+.sg-ghost.free { border-color: var(--accent); background: var(--accent-subtle); }
+.sg-ghost.conflict {
+  border-color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, #ef4444) 16%, transparent);
+}
+.sg-ghost-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+
+/* class cards — solid subject-color tiles, matching the app's timetable
+   (ClassCard): the color IS the card, name in themed text over it. The name
+   fills the card; controls overlay the corners. */
+.sg-card {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--c, var(--accent));
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition), filter var(--transition);
+}
+.sg-card.draggable { cursor: grab; }
+.sg-card.draggable:hover { box-shadow: var(--shadow-md); filter: brightness(1.06); }
+.sg-card.dragging { cursor: grabbing; box-shadow: var(--shadow-lg); z-index: 40; }
+.sg-card.locked { box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm); }
+.sg-card.excluded { opacity: 0.42; filter: saturate(0.4); }
+.sg-card.excluded .sg-card-name { text-decoration: line-through; }
+@media (prefers-reduced-motion: reduce) {
+  .sg-card { transition: none; }
+  .sg-card.draggable:hover { filter: none; }
+}
+
+/* just the name — time is read off the row, room/group don't matter on campus.
+   Themed text + shadow so it reads over any subject color (same as ClassCard). */
+.sg-card-name {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  line-height: 1.22;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+/* parity pill — its own dark chip so it reads on any color, both themes */
+.sg-week {
+  position: absolute;
+  left: 6px;
+  bottom: 3px;
+  font-size: 9px;
+  line-height: 1.5;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+}
+/* grip = "this one can move" — bottom-right, always shown on movable cards */
+.sg-grip {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  display: inline-flex;
+  color: var(--text-primary);
+  opacity: 0.6;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+.sg-card.draggable:hover .sg-grip { opacity: 0.95; }
+
+/* lock/exclude overlay the top-right corner, revealed on hover/focus so the
+   resting card is just the name (touch: always shown via the fallback below) */
+.sg-card-actions {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  gap: 3px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.sg-card:hover .sg-card-actions,
+.sg-card:focus-within .sg-card-actions,
+.sg-card.locked .sg-card-actions,
+.sg-card.excluded .sg-card-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sg-card-actions { opacity: 1; } /* no hover → always show */
+}
+.sg-icon-btn {
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.sg-icon-btn:hover { background: rgba(0, 0, 0, 0.55); border-color: rgba(255, 255, 255, 0.45); }
+.sg-icon-btn.on {
+  background: var(--accent);
+  border-color: #fff;
+  color: #fff;
+}
+.sg-icon-btn.danger.on {
+  background: var(--danger, #ef4444);
+  border-color: #fff;
+}
+.sg-icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* the edit step packs a grid + legend + actions — it fills the modal body
+   and its grid flexes, keeping the Save/Javítás row on-screen at any height */
+.wizard-panel-edit {
+  gap: var(--space-3);
+  flex: 1;
+  min-height: 0;
+}
+/* below-grid block: guide + status + actions, natural height (never shrinks) */
+.wizard-edit-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+.wizard-edit-head { flex-shrink: 0; }
+
+/* edit-step header: stat chips + legend */
+.wizard-edit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.wizard-stat-chips { display: flex; gap: var(--space-2); flex-shrink: 0; }
+.wizard-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.wizard-stat b { font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+.wizard-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.wizard-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.wizard-legend-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+.wizard-legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1.5px dashed;
+}
+.wizard-legend-swatch.free { border-color: var(--accent); background: var(--accent-subtle); }
+.wizard-legend-swatch.conflict {
+  border-color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, #ef4444) 14%, transparent);
+}
+
+.wizard-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* --- responsive (B3: stepper usable on mobile) ------------------------------- */
+
+@media (max-width: 768px) {
+  /* full-screen sheet on mobile */
+  .wizard-backdrop { padding: 0; }
+  .wizard-modal {
+    max-width: none;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+  .wizard-step-label { display: none; }
+  .wizard-step-chip.active .wizard-step-label { display: inline; }
+  .wizard-slider-row { grid-template-columns: 1fr 40px; }
+  .wizard-slider-row input[type='range'] { grid-column: 1 / -1; }
+  .wizard-schedules { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wizard-step-chip, .wizard-schedule-card, .wizard-switch, .wizard-switch-knob { transition: none; }
+  .wizard-loader-block { animation: none; opacity: 0.6; }
+}
+
+@media (max-width: 768px) {
+  /* grid flexes to fill; just tighten labels on phones */
+  .sg-gutter-tick { font-size: 9px; }
+  .wizard-legend { gap: var(--space-3); font-size: 11px; }
+}

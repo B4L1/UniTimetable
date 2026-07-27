@@ -45,11 +45,19 @@ export default function ClassCard({
     isCustom = false,
 }: ClassCardProps) {
     // Subscribe to theme context to force re-render when colors change
-    useAppStore((state: any) => state.preferences.backgroundTheme);
+    useAppStore(state => state.preferences.colorTheme);
 
     const subjectColor = getSubjectColor(data.subjectName);
     const teacherDisplay = data.teacherName || data.teacherCode || '';
     const roomDisplay = data.classroom?.split('-')[0] || data.classroom || '';
+
+    // Truncated cards reveal everything on hover (spec §7.4)
+    const tooltip = [data.subjectName, teacherDisplay, data.classroom, data.className]
+        .filter(Boolean).join(' · ');
+
+    // Spec §5.1: solid surfaces on the timetable. The planner variants keep
+    // the translucent fill their parity/custom overlays are designed around.
+    const cardBackground = variant === 'default' ? subjectColor : `${subjectColor}80`;
 
     const cardContent = (
         <div className="class-card-content">
@@ -102,8 +110,9 @@ export default function ClassCard({
     return (
         <div
             className={baseClassName}
+            title={tooltip}
             style={{
-                background: `var(--card-bg-override, ${subjectColor}80)`,
+                background: `var(--card-bg-override, ${cardBackground})`,
                 borderColor: `var(--card-border-override, rgba(255, 255, 255, 0.15))`,
                 '--subject-color': subjectColor
             } as React.CSSProperties}

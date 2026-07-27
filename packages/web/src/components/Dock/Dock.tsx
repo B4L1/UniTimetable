@@ -11,6 +11,8 @@ import React, { Children, cloneElement, useEffect, useState } from 'react';
 import './Dock.css';
 
 export interface DockItemData {
+    /** Stable identity (labels may change, e.g. "Mentés…") */
+    id?: string;
     icon: React.ReactNode;
     label: string;
     onClick: () => void;
@@ -20,9 +22,15 @@ export interface DockItemData {
 };
 
 export type DockProps = {
+    /** Constant block — rightmost, fixed order, NEVER animated. */
     items: DockItemData[];
+    /** Tab-specific buttons — swap as ONE collapsible block on the left. */
+    extras?: DockItemData[];
+    /** Identity of the current extras set (e.g. the active tab). */
+    extrasKey?: string;
     className?: string;
     itemSize?: number;
+    /** Extra non-button controls (search etc.), rendered inside the extras block. */
     children?: React.ReactNode;
 };
 
@@ -58,7 +66,7 @@ function DockItem({
             aria-haspopup="true"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 26 }}
         >
             {Children.map(children, child =>
                 React.isValidElement(child)
@@ -115,28 +123,62 @@ function DockIcon({ children, className = '' }: DockIconProps) {
     return <div className={`dock-icon ${className}`}>{children}</div>;
 }
 
+/**
+ * No layout animation anywhere in this component — that's deliberate.
+ * Layout springs + popLayout + width:auto retarget each other mid-flight,
+ * which reads as "smooth, then slows, then snaps". Instead the tab-specific
+ * region enters/leaves as ONE block with two sequenced width tweens
+ * (mode="wait": old block collapses fully, then the new one expands), and
+ * the constant items on the right are plain static DOM.
+ */
 export default function Dock({
     items,
+    extras = [],
+    extrasKey = 'extras',
     className = '',
     itemSize = 42,
     children
 }: DockProps) {
+    const hasExtras = extras.length > 0 || !!children;
+
+    const renderItem = (item: DockItemData) => (
+        <DockItem
+            key={item.id ?? item.label}
+            className={`${item.active ? 'active' : ''} ${item.className || ''}`}
+            onClick={item.onClick}
+            size={itemSize}
+        >
+            <DockIcon>{item.icon}</DockIcon>
+            <DockLabel>{item.label}</DockLabel>
+        </DockItem>
+    );
+
     return (
         <div className="dock-outer">
-            <div
-                className={`dock-panel ${className}`}
-                role="toolbar"
-            >
-                {children && <div className="dock-content">{children}</div>}
+            <div className={`dock-panel ${className}`} role="toolbar">
+                <AnimatePresence initial={false} mode="wait">
+                    {hasExtras && (
+                        <motion.div
+                            key={extrasKey}
+                            className="dock-extras"
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: 'auto', opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{
+                                width: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
+                                opacity: { duration: 0.16 }
+                            }}
+                        >
+                            <div className="dock-extras-inner">
+                                {children}
+                                {extras.map(renderItem)}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                {items.map((item, index) => (
-                    <DockItem key={`dock-item-${index}`} className={`${item.active ? 'active' : ''} ${item.className || ''}`} onClick={item.onClick} size={itemSize}>
-                        <DockIcon>{item.icon}</DockIcon>
-                        <DockLabel>{item.label}</DockLabel>
-                    </DockItem>
-                ))}
+                {items.map(renderItem)}
             </div>
         </div>
     );
 }
-

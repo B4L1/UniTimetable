@@ -253,12 +253,12 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0f0f23',
+        backgroundColor: '#12121a',
     },
     centered: {
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#0f0f23',
+        backgroundColor: '#12121a',
     },
     loadingText: {
         color: 'rgba(255,255,255,0.7)',

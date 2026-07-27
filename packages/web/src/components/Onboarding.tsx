@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
-import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass, fetchTeachers } from '@shared/index';
+import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass, fetchTeachers, fetchUserPreferences, fetchClassById } from '@shared/index';
 import type { ClassData, Teacher } from '@shared/lib/types';
 import './Onboarding.css';
 
@@ -19,11 +19,71 @@ const Onboarding: React.FC = () => {
     const [selectedFaculty, setSelectedFaculty] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number | null>(null);
     const [selectedGroup, setSelectedGroup] = useState<string>('');
+    const [isAutoLoading, setIsAutoLoading] = useState(true);
 
     useEffect(() => {
-        fetchClasses().then(setClasses);
-        fetchTeachers().then(setTeachers);
-    }, []);
+        let isCancelled = false;
+
+        const loadData = async () => {
+            setIsAutoLoading(true);
+
+            const [classesData, teachersData] = await Promise.all([
+                fetchClasses(),
+                fetchTeachers(),
+            ]);
+
+            if (isCancelled) return;
+
+            setClasses(classesData);
+            setTeachers(teachersData);
+
+            // Try to auto-load saved class from server
+            if (user?.email && user.role === 'student') {
+                const prefs = await fetchUserPreferences(user.email);
+                if (isCancelled) return;
+
+                const selectionId = prefs?.selected_class_id || user.selectionId;
+                if (selectionId) {
+                    let savedClass = classesData.find(c => c.id === selectionId) || null;
+
+                    if (!savedClass) {
+                        savedClass = await fetchClassById(selectionId);
+                        if (savedClass) {
+                            setClasses((current) => {
+                                const exists = current.some(c => c.id === savedClass!.id);
+                                return exists ? current : [...current, savedClass!];
+                            });
+                        }
+                    }
+
+                    if (savedClass) {
+                        await setSelectedClass({
+                            id: savedClass.id,
+                            name: savedClass.name,
+                            faculty: savedClass.faculty || '',
+                            year: savedClass.year,
+                            groupCode: savedClass.group_code || '',
+                        });
+
+                        if (user.selectionId !== selectionId) {
+                            await setUser({ ...user, selectionId });
+                        }
+
+                        navigate('/');
+                        return;
+                    }
+                }
+            }
+
+            setIsAutoLoading(false);
+        };
+
+        loadData();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [navigate, setSelectedClass, setUser, user?.email]);
 
     const faculties = getUniqueFaculties(classes);
     const years = selectedFaculty ? getYearsForFaculty(classes, selectedFaculty) : [];
@@ -32,8 +92,8 @@ const Onboarding: React.FC = () => {
         : [];
 
     if (!user) {
-        navigate('/login');
-        return null;
+        // Declarative redirect — calling navigate() during render is a React anti-pattern
+        return <Navigate to="/login" replace />;
     }
 
     const isStudent = user.role === 'student';
@@ -79,7 +139,7 @@ const Onboarding: React.FC = () => {
             background: 'var(--bg-secondary)',
             borderColor: 'var(--border)',
             color: 'var(--text-primary)',
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-sm)',
             '&:hover': {
                 borderColor: 'var(--accent)'
             }

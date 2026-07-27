@@ -6,6 +6,7 @@ const KEYS = {
     FIRST_LAUNCH: 'unitimetable_first_launch',
     SELECTED_CLASS: 'unitimetable_selected_class',
     TIMETABLE_CACHE: 'unitimetable_cache',
+    SELECTED_ENTRIES_CACHE: 'unitimetable_selected_entries_cache',
     USER_SELECTIONS: 'unitimetable_selections',
     PREFERENCES: 'unitimetable_preferences',
     IMPORTED_SUBJECTS: 'unitimetable_imported_subjects',
@@ -31,7 +32,9 @@ export const webStorage: IStorage & {
     setUser: (user: any) => Promise<void>,
     clearUser: () => Promise<void>,
     getSelectedTeacher: () => Promise<{ id: string, name: string } | null>,
-    setSelectedTeacher: (teacher: { id: string, name: string }) => Promise<void>
+    setSelectedTeacher: (teacher: { id: string, name: string }) => Promise<void>,
+    getSelectedEntriesCache: () => Promise<any[] | null>,
+    setSelectedEntriesCache: (entries: any[]) => Promise<void>
 } = {
     async isFirstLaunch(): Promise<boolean> {
         const value = localStorage.getItem(KEYS.FIRST_LAUNCH);
@@ -88,7 +91,9 @@ export const webStorage: IStorage & {
     },
 
     async reset(): Promise<void> {
-        localStorage.clear();
+        // Only remove our own keys — localStorage.clear() would also wipe
+        // unrelated data on this origin (e.g. the last-dark-theme preference).
+        Object.values(KEYS).forEach(key => localStorage.removeItem(key));
     },
 
     async clearClass(): Promise<void> {
@@ -149,5 +154,14 @@ export const webStorage: IStorage & {
 
     async setSelectedTeacher(teacher: { id: string, name: string }): Promise<void> {
         localStorage.setItem(KEYS.SELECTED_TEACHER, JSON.stringify(teacher));
+    },
+
+    async getSelectedEntriesCache(): Promise<any[] | null> {
+        const value = localStorage.getItem(KEYS.SELECTED_ENTRIES_CACHE);
+        return value ? JSON.parse(value) : null;
+    },
+
+    async setSelectedEntriesCache(entries: any[]): Promise<void> {
+        localStorage.setItem(KEYS.SELECTED_ENTRIES_CACHE, JSON.stringify(entries));
     }
 };

@@ -1,112 +1,41 @@
-// Background selector - renders the appropriate background based on theme
+// Background effect renderer.
+//
+// v3 rules (SPEC_V3_PLAN.md B5/B9):
+// - effects are device-local and OFF by default
+// - every effect is a lazy chunk, fetched only when actually selected
+//   (no preloading — the default bundle must stay free of three.js/ogl)
+// - prefers-reduced-motion disables all effects
 
-import React, { memo, Suspense, lazy, useEffect } from 'react';
-import type { BackgroundTheme } from '@shared/lib/types';
+import React, { memo, Suspense, lazy } from 'react';
+import type { BackgroundEffect } from '@shared/lib/types';
+import { useBackgroundEffect, prefersReducedMotion } from '../../utils/backgroundEffect';
 
 const Aurora = lazy(() => import('./Aurora'));
-const Silk = lazy(() => import('./Silk'));
-// @ts-ignore
+// @ts-expect-error untyped .jsx module
 const LiquidChromeComponent = lazy(() => import('./LiquidChrome.jsx'));
-// @ts-ignore
-const BeamsComponent = lazy(() => import('./Beams.jsx'));
-// @ts-ignore
-const DitherComponent = lazy(() => import('./Dither.jsx'));
-// @ts-ignore
+// @ts-expect-error untyped .jsx module
 const FaultyTerminalComponent = lazy(() => import('./FaultyTerminal.jsx'));
-// @ts-ignore
+// @ts-expect-error untyped .jsx module
 const IridescenceComponent = lazy(() => import('./Iridescence.jsx'));
-// @ts-ignore
+// @ts-expect-error untyped .jsx module
 const PixelBlastComponent = lazy(() => import('./PixelBlast.jsx'));
 
-// Import CSS for React Bits components
+// Effect CSS is small; keeping these static keeps styling glitch-free
 import './LiquidChrome.css';
-import './Beams.css';
-import './Dither.css';
 import './FaultyTerminal.css';
 import './Iridescence.css';
 import './PixelBlast.css';
 
-interface BackgroundSelectorProps {
-    theme: BackgroundTheme;
-}
-
-function AuroraBg() {
-    return (
-        <div className="background-container">
-            <Aurora />
-        </div>
-    );
-}
-
-function SilkBg() {
-    return (
-        <div className="background-container">
-            <Silk />
-        </div>
-    );
-}
-
-// Wrapper components to add full-screen positioning
-function LiquidChrome() {
-    return (
-        <div className="background-container">
-            <LiquidChromeComponent />
-        </div>
-    );
-}
-
-function Beams() {
-    return (
-        <div className="background-container">
-            <BeamsComponent />
-        </div>
-    );
-}
-
-function Dither() {
-    return (
-        <div className="background-container">
-            <DitherComponent />
-        </div>
-    );
-}
-
-function FaultyTerminal() {
-    return (
-        <div className="background-container">
-            <FaultyTerminalComponent />
-        </div>
-    );
-}
-
-function Iridescence() {
-    return (
-        <div className="background-container">
-            <IridescenceComponent />
-        </div>
-    );
-}
-
-function PixelBlast() {
-    return (
-        <div className="background-container">
-            <PixelBlastComponent />
-        </div>
-    );
-}
-
-// Plasma wrapper removed
-
 class BackgroundErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-    constructor(props: any) {
+    constructor(props: { children: React.ReactNode }) {
         super(props);
         this.state = { hasError: false };
     }
     static getDerivedStateFromError() {
         return { hasError: true };
     }
-    componentDidCatch(error: any) {
-        console.error("Background component crashed:", error);
+    componentDidCatch(error: unknown) {
+        console.error('Background component crashed:', error);
     }
     render() {
         if (this.state.hasError) {
@@ -116,46 +45,28 @@ class BackgroundErrorBoundary extends React.Component<{ children: React.ReactNod
     }
 }
 
-function BackgroundSelector({ theme }: BackgroundSelectorProps) {
-    useEffect(() => {
-        void import('./Aurora');
-        void import('./Silk');
-        void import('./LiquidChrome.jsx');
-        void import('./Beams.jsx');
-        void import('./Dither.jsx');
-        void import('./FaultyTerminal.jsx');
-        void import('./Iridescence.jsx');
-        void import('./PixelBlast.jsx');
-    }, []);
+const EFFECT_COMPONENTS: Partial<Record<BackgroundEffect, React.LazyExoticComponent<React.ComponentType>>> = {
+    'aurora': Aurora,
+    'liquid-chrome': LiquidChromeComponent,
+    'faulty-terminal': FaultyTerminalComponent,
+    'iridescence': IridescenceComponent,
+    'pixel-blast': PixelBlastComponent,
+};
 
-    const renderBackground = () => {
-        switch (theme) {
-            case 'aurora':
-                return <AuroraBg />;
+function BackgroundSelector() {
+    const effect = useBackgroundEffect();
 
-            case 'silk':
-                return <SilkBg />;
-            case 'beams':
-                return <Beams />;
-            case 'iridescence':
-                return <Iridescence />;
-            case 'liquid-chrome':
-                return <LiquidChrome />;
-            case 'pixel-blast':
-                return <PixelBlast />;
-            case 'dither':
-                return <Dither />;
-            case 'faulty-terminal':
-                return <FaultyTerminal />;
-            default:
-                return null;
-        }
-    };
+    if (effect === 'none' || prefersReducedMotion()) return null;
+
+    const EffectComponent = EFFECT_COMPONENTS[effect];
+    if (!EffectComponent) return null;
 
     return (
         <Suspense fallback={<div className="background-fallback" />}>
-            <BackgroundErrorBoundary key={theme}>
-                {renderBackground()}
+            <BackgroundErrorBoundary key={effect}>
+                <div className="background-container">
+                    <EffectComponent />
+                </div>
             </BackgroundErrorBoundary>
         </Suspense>
     );

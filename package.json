@@ -11,7 +11,11 @@
     "build:mobile:android": "pnpm --filter @unitimetable/mobile run android",
     "build:mobile:ios": "pnpm --filter @unitimetable/mobile run ios",
     "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r exec -- rm -rf node_modules && rm -rf node_modules"
+    "clean": "pnpm -r exec -- rm -rf node_modules && rm -rf node_modules",
+    "share": "node start-sharing.js",
+    "share:mobile": "node start-sharing.js --mobile",
+    "share:help": "node start-sharing.js --help",
+    "setup:verify": "node setup-verify.js"
   },
   "engines": {
     "node": ">=18.0.0",

@@ -1,5 +1,5 @@
-[data-theme='sapientia'],
-body[data-theme='sapientia'] {
+[data-theme='light'],
+body[data-theme='light'] {
     --sap-green: #0A6C42;
     --sap-green-light: #34d399;
     --sap-navy: #1e293b;
@@ -14,26 +14,32 @@ body[data-theme='sapientia'] {
     --sap-teal: #00A0E3;
     --sap-lime: #8FC31F;
 
-    /* Sapientia Extras */
-    --sap-orange: #F39200;
-    --sap-blue: #0054A6;
-    --sap-red: #A6192E;
-    --sap-teal: #00A0E3;
-    --sap-lime: #8FC31F;
-
-    --bg-primary: var(--sap-bg);
-    --bg-secondary: #ffffff;
-    --bg-card: #ffffff;
+    /* Semantic tokens (spec §4.2) — legacy --bg-primary/--border/… names
+       resolve through the :root aliases in index.css */
+    --bg-app: var(--sap-bg);
+    --bg-surface: #ffffff;
+    --bg-elevated: #ffffff;
+    --bg-hover: rgba(0, 0, 0, 0.04);
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-strong: #cbd5e1;
+    --grid-line: rgba(0, 0, 0, 0.05);
     --text-primary: #0f172a;
-    --text-secondary: #64748b;
+    --text-secondary: #475569;
+    --text-tertiary: #64748b;
 
     --accent: var(--sap-green);
     --accent-hover: #085c38;
-    --border: #e2e8f0;
+    --accent-subtle: rgba(10, 108, 66, 0.1);
     --success: #16a34a;
-    --error: #dc2626;
+    --danger: #dc2626;
+    --warning: #b45309;
 
-    /* Solid styling */
+    /* Legacy names whose light values differ from the semantic mapping */
+    --bg-tertiary: #f8fafc;
+    --bg-alt: #e2e8f0;
+    --border: #e2e8f0;
+
+    /* Glass tokens resolve to solid white — the light theme never blurs */
     --glass-bg: #ffffff;
     --glass-border: #cbd5e1;
 
@@ -46,18 +52,18 @@ body[data-theme='sapientia'] {
 }
 
 /* Specific overrides for Sapientia theme */
-body[data-theme='sapientia'] .glass,
-body[data-theme='sapientia'] .glass-card {
+body[data-theme='light'] .glass,
+body[data-theme='light'] .glass-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     box-shadow: var(--shadow-sm);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     /* Slightly tighter corners for the academic light theme */
 }
 
-body[data-theme='sapientia'] .glass-header {
+body[data-theme='light'] .glass-header {
     background: var(--bg-card);
     border: 1px solid var(--border);
     backdrop-filter: none;
@@ -68,43 +74,43 @@ body[data-theme='sapientia'] .glass-header {
 }
 
 /* Header style - Clean White with Green Accent */
-body[data-theme='sapientia'] .app-header {
+body[data-theme='light'] .app-header {
     background: #ffffff;
     border-bottom: 3px solid var(--sap-green);
     box-shadow: var(--shadow-sm);
 }
 
-body[data-theme='sapientia'] .app-header h1 {
+body[data-theme='light'] .app-header h1 {
     color: var(--sap-navy);
     /* Navy text for title */
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.5px;
 }
 
 /* Dock/Nav items - The "Navbar section" */
-body[data-theme='sapientia'] .dock-panel {
+body[data-theme='light'] .dock-panel {
     background: var(--sap-navy-light) !important;
     /* Navy Background from image */
     border: none !important;
     box-shadow: var(--shadow-lg) !important;
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: 8px;
     /* Add padding for buttons */
 }
 
-body[data-theme='sapientia'] .dock-item {
+body[data-theme='light'] .dock-item {
     color: rgba(255, 255, 255, 0.7);
     /* Light gray text on navy */
-    transition: all 0.2s ease;
+    transition: all var(--transition);
 }
 
-body[data-theme='sapientia'] .dock-item:hover {
+body[data-theme='light'] .dock-item:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
     transform: translateY(-2px);
 }
 
-body[data-theme='sapientia'] .dock-item.active {
+body[data-theme='light'] .dock-item.active {
     background: var(--sap-green);
     /* Green selected state */
     color: white !important;
@@ -114,8 +120,8 @@ body[data-theme='sapientia'] .dock-item.active {
 
 /* CARDS - "Make the cards be those colors" (Assuming Green/Mint from Hallgatóknak) */
 /* We'll use a very subtle mint background for cards to distinguish from white page */
-body[data-theme='sapientia'] .settings-card,
-body[data-theme='sapientia'] .welcome-card {
+body[data-theme='light'] .settings-card,
+body[data-theme='light'] .welcome-card {
     background: #f0fdf4;
     /* Mint green tint (emerald-50) */
     border: 1px solid #bbf7d0;
@@ -123,35 +129,35 @@ body[data-theme='sapientia'] .welcome-card {
 }
 
 /* Welcome Page Overrides */
-body[data-theme='sapientia'] .welcome-card h1 {
+body[data-theme='light'] .welcome-card h1 {
     background: none;
     -webkit-text-fill-color: initial;
     color: var(--sap-green);
 }
 
-body[data-theme='sapientia'] .start-btn {
+body[data-theme='light'] .start-btn {
     background: var(--sap-green);
     box-shadow: 0 4px 12px rgba(10, 108, 66, 0.3);
 }
 
-body[data-theme='sapientia'] .start-btn:hover:not(:disabled) {
+body[data-theme='light'] .start-btn:hover:not(:disabled) {
     background: var(--accent-hover);
     box-shadow: 0 8px 20px rgba(10, 108, 66, 0.4);
 }
 
-body[data-theme='sapientia'] .welcome-import-btn {
+body[data-theme='light'] .welcome-import-btn {
     background: var(--sap-bg-alt);
     border: 1px dashed var(--text-secondary);
     color: var(--text-primary);
 }
 
-body[data-theme='sapientia'] .welcome-import-btn:hover {
+body[data-theme='light'] .welcome-import-btn:hover {
     background: #e2e8f0;
     border-color: var(--sap-navy);
 }
 
 /* Class Cards in Timetable */
-body[data-theme='sapientia'] .class-card {
+body[data-theme='light'] .class-card {
     border: 2px solid var(--subject-color) !important;
     box-shadow: var(--shadow-md) !important;
     /* Use the variable set by ClassCard.tsx inline style, but force it solid */
@@ -160,15 +166,15 @@ body[data-theme='sapientia'] .class-card {
 }
 
 /* Bi-weekly overlay overrides for Sapientia (light theme) */
-body[data-theme='sapientia'] .class-card.is-odd-week::before {
+body[data-theme='light'] .class-card.is-odd-week::before {
     background: linear-gradient(-45deg, var(--sap-bg-alt, #f5f5f5) 50%, transparent 50.1%);
 }
 
-body[data-theme='sapientia'] .class-card.is-even-week::before {
+body[data-theme='light'] .class-card.is-even-week::before {
     background: linear-gradient(-45deg, transparent 49.9%, var(--sap-bg-alt, #f5f5f5) 50%);
 }
 
-body[data-theme='sapientia'] .class-card--dropdown.is-odd-week.is-custom::before {
+body[data-theme='light'] .class-card--dropdown.is-odd-week.is-custom::before {
     background: linear-gradient(-45deg, 
         var(--sap-bg-alt, #f5f5f5) 43%, 
         var(--subject-color) 43%, var(--subject-color) 46%, 
@@ -177,7 +183,7 @@ body[data-theme='sapientia'] .class-card--dropdown.is-odd-week.is-custom::before
     );
 }
 
-body[data-theme='sapientia'] .class-card--dropdown.is-even-week.is-custom::before {
+body[data-theme='light'] .class-card--dropdown.is-even-week.is-custom::before {
     background: linear-gradient(-45deg, 
         transparent 50%, 
         var(--sap-bg-alt, #f5f5f5) 50%, var(--sap-bg-alt, #f5f5f5) 54%, 
@@ -186,7 +192,7 @@ body[data-theme='sapientia'] .class-card--dropdown.is-even-week.is-custom::befor
     );
 }
 
-body[data-theme='sapientia'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
+body[data-theme='light'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
     content: "";
     position: absolute; top:0; left:0; right:0; bottom:0;
     pointer-events: none; border-radius: inherit; z-index: -1;
@@ -198,101 +204,101 @@ body[data-theme='sapientia'] .class-card--dropdown.is-custom:not(.is-odd-week):n
 }
 
 /* Ensure text inherits white color */
-body[data-theme='sapientia'] .class-card-subject,
-body[data-theme='sapientia'] .class-card-teacher,
-body[data-theme='sapientia'] .class-card-room,
-body[data-theme='sapientia'] .class-card-classname {
+body[data-theme='light'] .class-card-subject,
+body[data-theme='light'] .class-card-teacher,
+body[data-theme='light'] .class-card-room,
+body[data-theme='light'] .class-card-classname {
     color: inherit !important;
     opacity: 0.95;
 }
 
 /* Day Headers */
-body[data-theme='sapientia'] .day-header {
+body[data-theme='light'] .day-header {
     background: #ffffff;
     border: 1px solid var(--border);
     color: var(--sap-navy);
-    font-weight: 700;
+    font-weight: 600;
 }
 
-body[data-theme='sapientia'] .day-header.today {
+body[data-theme='light'] .day-header.today {
     background: var(--sap-green);
     color: white;
     border-color: var(--sap-green);
 }
 
 /* Select inputs and forms */
-body[data-theme='sapientia'] select,
-body[data-theme='sapientia'] input[type="text"] {
+body[data-theme='light'] select,
+body[data-theme='light'] input[type="text"] {
     background: #ffffff;
     border: 1px solid var(--border);
     color: var(--text-primary);
 }
 
-body[data-theme='sapientia'] select:focus,
-body[data-theme='sapientia'] input[type="text"]:focus {
+body[data-theme='light'] select:focus,
+body[data-theme='light'] input[type="text"]:focus {
     border-color: var(--sap-green);
     outline: 2px solid rgba(10, 108, 66, 0.2);
 }
 
 /* Toggle Switch */
-body[data-theme='sapientia'] .toggle {
+body[data-theme='light'] .toggle {
     background: #cbd5e1;
 }
 
-body[data-theme='sapientia'] .toggle.active {
+body[data-theme='light'] .toggle.active {
     background: var(--sap-green);
 }
 
 /* Navbar Search Input (Planner) */
-body[data-theme='sapientia'] .dock-panel input[type="text"] {
+body[data-theme='light'] .dock-panel input[type="text"] {
     background: rgba(255, 255, 255, 0.1) !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     color: #ffffff !important;
 }
 
-body[data-theme='sapientia'] .dock-panel input[type="text"]::placeholder {
+body[data-theme='light'] .dock-panel input[type="text"]::placeholder {
     color: rgba(255, 255, 255, 0.5) !important;
 }
 
-body[data-theme='sapientia'] .dock-panel input[type="checkbox"] {
+body[data-theme='light'] .dock-panel input[type="checkbox"] {
     accent-color: var(--sap-green);
 }
 
-body[data-theme='sapientia'] .dock-panel label {
+body[data-theme='light'] .dock-panel label {
     color: rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Planner Hover Tints - Green for Sapientia */
-body[data-theme='sapientia'] .planner-slot-cell.clickable:not(.has-selection):hover,
-body[data-theme='sapientia'] .planner-slot-cell.clickable .empty-slot-plus:hover,
-body[data-theme='sapientia'] .planner-slot-cell.clickable .half-slot-plus:hover {
+body[data-theme='light'] .planner-slot-cell.clickable:not(.has-selection):hover,
+body[data-theme='light'] .planner-slot-cell.clickable .empty-slot-plus:hover,
+body[data-theme='light'] .planner-slot-cell.clickable .half-slot-plus:hover {
     background: rgba(10, 108, 66, 0.15) !important;
     border-color: rgba(10, 108, 66, 0.3);
 }
 
 /* Planner Empty Slot Icons */
-body[data-theme='sapientia'] .empty-slot-plus span,
-body[data-theme='sapientia'] .half-slot-plus span {
+body[data-theme='light'] .empty-slot-plus span,
+body[data-theme='light'] .half-slot-plus span {
     color: var(--sap-green) !important;
     opacity: 0.8;
 }
 
-body[data-theme='sapientia'] .empty-slot-plus:hover span,
-body[data-theme='sapientia'] .half-slot-plus:hover span {
+body[data-theme='light'] .empty-slot-plus:hover span,
+body[data-theme='light'] .half-slot-plus:hover span {
     opacity: 1;
     transform: scale(1.1);
     color: var(--sap-green-light) !important;
 }
 
 /* Planner Search Highlights - Minty Green */
-body[data-theme='sapientia'] .planner-slot-cell.search-active.search-match {
+body[data-theme='light'] .planner-slot-cell.search-active.search-match {
     border-color: var(--sap-green-light) !important;
     background: rgba(52, 211, 153, 0.1) !important;
     box-shadow: inset 0 0 0 2px var(--sap-green-light), 0 0 12px rgba(52, 211, 153, 0.2) !important;
 }
 
 /* Time Marker - Dark Green Override */
-body[data-theme='sapientia'] .time-marker {
+body[data-theme='light'] .time-marker {
     --time-line-color: #0A6C42;
     --time-line-glow: rgba(10, 108, 66, 0.4);
     height: 3px !important;
@@ -300,32 +306,32 @@ body[data-theme='sapientia'] .time-marker {
 }
 
 /* Settings Rows & Dropdowns for Sapientia */
-body[data-theme='sapientia'] .settings-row {
+body[data-theme='light'] .settings-row {
     border-bottom: 1px solid var(--border);
 }
 
-body[data-theme='sapientia'] .settings-row:hover {
+body[data-theme='light'] .settings-row:hover {
     background: rgba(0, 0, 0, 0.03);
 }
 
-body[data-theme='sapientia'] .dropdown-content {
+body[data-theme='light'] .dropdown-content {
     border-top: 1px solid var(--border);
 }
 
-body[data-theme='sapientia'] .dropdown-option:hover {
+body[data-theme='light'] .dropdown-option:hover {
     background: rgba(0, 0, 0, 0.05);
 }
 
-body[data-theme='sapientia'] .dropdown-option.selected {
+body[data-theme='light'] .dropdown-option.selected {
     background: rgba(10, 108, 66, 0.1);
 }
 
 /* Scrollbar for Sapientia */
-body[data-theme='sapientia'] ::-webkit-scrollbar-thumb {
+body[data-theme='light'] ::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.2);
 }
 
-body[data-theme='sapientia'] ::-webkit-scrollbar-thumb:hover {
+body[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.3);
 }
 

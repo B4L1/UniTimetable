@@ -1,13 +1,15 @@
 // Timetable component for web
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, Fragment } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
+import { webStorage } from '../stores/webStorage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { fetchTimetableEntries, fetchTimetableEntriesByIds, fetchTeacherTimetable } from '@shared/index';
+import { fetchTimetableEntries, fetchTimetableEntriesByIds, fetchTeacherTimetable, assignSubjectColors } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
 import type { TimetableEntry } from '@shared/lib/types';
 import ClassCard from './ClassCard';
+import ClassDetailModal from './ClassDetailModal';
 
 // 2-hour time slots
 const TIME_SLOTS = [
@@ -19,21 +21,11 @@ const TIME_SLOTS = [
     { label: '11-12', start: '18:30', end: '20:20' },
 ];
 
-const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
+// Saturday (index 5) exists in edupage data for some programs; the grid only
+// shows it when the displayed timetable actually has a Saturday class.
+const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', 'Szombat'];
 
 import { getAcademicWeek } from '../utils/calendar';
-
-// Find which slot an entry belongs to
-function getSlotIndex(startTime: string): number {
-    const [hours] = startTime.split(':').map(Number);
-    if (hours >= 8 && hours < 10) return 0;
-    if (hours >= 10 && hours < 12) return 1;
-    if (hours >= 12 && hours < 14) return 2;
-    if (hours >= 14 && hours < 16) return 3;
-    if (hours >= 16 && hours < 18) return 4;
-    if (hours >= 18 && hours < 20) return 5;
-    return -1;
-}
 
 // Helper to get minutes from "HH:MM"
 function getMinutes(timeStr: string): number {
@@ -41,10 +33,29 @@ function getMinutes(timeStr: string): number {
     return h * 60 + m;
 }
 
-export default function Timetable() {
-    const { selectedClass, selectedTeacher, timetableEntries, setTimetableEntries, userSelections, isLoading, preferences } = useAppStore();
+interface TimetableProps {
+    onExportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+}
+
+export default function Timetable({ onExportRef }: TimetableProps = {}) {
+    const { selectedClass, selectedTeacher, timetableEntries, setTimetableEntries, userSelections, isLoading, preferences, customEntries } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
-    const carouselRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
+
+    // Desktop viewport tiers (spec §2.4–2.5): shrink typography before ever
+    // allowing scroll; below a usable minimum show a fallback message.
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [sizeTier, setSizeTier] = useState<'normal' | 'compact' | 'too-small'>('normal');
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(entries => {
+            const h = entries[0].contentRect.height;
+            setSizeTier(h < 340 ? 'too-small' : h < 560 ? 'compact' : 'normal');
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [isMobile]);
 
     // Track current time
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -62,15 +73,14 @@ export default function Timetable() {
     }, []);
 
     // Determine current week type based on settings or auto-calculation
+    const academicWeek = useMemo(() => getAcademicWeek(), []);
     const currentWeekType = useMemo(() => {
-        const calculatedWeek = getAcademicWeek().type;
-        // If it's a break or out of term, we still might want to show *something* or handle it gracefully.
-        // For now we just return it, the filter logic might skip odd/even specific classes if it's 'break'.
+        const calculatedWeek = academicWeek.type;
         if (preferences.invertWeekParity && (calculatedWeek === 'odd' || calculatedWeek === 'even')) {
             return calculatedWeek === 'odd' ? 'even' : 'odd';
         }
         return calculatedWeek;
-    }, [preferences.invertWeekParity]);
+    }, [preferences.invertWeekParity, academicWeek]);
 
     const today = new Date().getDay() - 1; // 0 = Monday
 
@@ -81,9 +91,13 @@ export default function Timetable() {
     // Always fetch original timetable entries for the base schedule
     useEffect(() => {
         if (selectedClass?.id) {
-            fetchTimetableEntries(selectedClass.id).then(setTimetableEntries);
+            fetchTimetableEntries(selectedClass.id).then(entries => {
+                if (entries.length > 0) setTimetableEntries(entries);
+            });
         } else if (selectedTeacher?.id) {
-            fetchTeacherTimetable(selectedTeacher.id).then(setTimetableEntries);
+            fetchTeacherTimetable(selectedTeacher.id).then(entries => {
+                if (entries.length > 0) setTimetableEntries(entries);
+            });
         }
     }, [selectedClass?.id, selectedTeacher?.id]);
 
@@ -92,23 +106,57 @@ export default function Timetable() {
         if (userSelections.length > 0) {
             setLoadingSelections(true);
             fetchTimetableEntriesByIds(userSelections)
-                .then(setUserSelectedEntries)
+                .then(async entries => {
+                    if (entries.length > 0) {
+                        setUserSelectedEntries(entries);
+                        await webStorage.setSelectedEntriesCache(entries);
+                    } else {
+                        // Fetch returned empty — likely offline. Fall back to cache.
+                        const cached = await webStorage.getSelectedEntriesCache();
+                        if (cached && cached.length > 0) {
+                            setUserSelectedEntries(cached);
+                        }
+                    }
+                })
                 .finally(() => setLoadingSelections(false));
         } else {
             setUserSelectedEntries([]);
         }
     }, [userSelections]);
 
+    // Deterministic subject colors: assign from the full (sorted) subject set.
+    // v3: one muted palette for all themes, so this only depends on the data.
+    useEffect(() => {
+        const names = [...timetableEntries, ...userSelectedEntries].map(e => e.subject_name);
+        if (names.length > 0) assignSubjectColors(names);
+    }, [timetableEntries, userSelectedEntries]);
+
+    // Saturday column only when the displayed data needs it
+    const hasSaturday = useMemo(
+        () => [...timetableEntries, ...userSelectedEntries].some(e => e.day_of_week === 5),
+        [timetableEntries, userSelectedEntries]
+    );
+    const visibleDays = hasSaturday ? DAYS : DAYS.slice(0, 5);
+    const dayCount = visibleDays.length;
+
+    // Class detail window (tap a card to open; desktop cards morph via layoutId)
+    const [detailEntry, setDetailEntry] = useState<AvailableClassEntry | null>(null);
+
     // Mobile Carousel State
     const [currentDayIndex, setCurrentDayIndex] = useState(today >= 0 && today < 5 ? today : 0);
     const [direction, setDirection] = useState(0);
+
+    // If today is a Saturday with classes, land on it once the data loads
+    useEffect(() => {
+        if (hasSaturday && today === 5) setCurrentDayIndex(5);
+    }, [hasSaturday, today]);
 
     const paginate = (newDirection: number) => {
         setDirection(newDirection);
         setCurrentDayIndex(prev => {
             const next = prev + newDirection;
-            if (next > 4) return 0;
-            if (next < 0) return 4;
+            if (next > dayCount - 1) return 0;
+            if (next < 0) return dayCount - 1;
             return next;
         });
     };
@@ -157,15 +205,55 @@ export default function Timetable() {
         return userSelectedEntries;
     }, [userSelections.length, userSelectedEntries, timetableEntries]);
 
-    // Filter entries for current week
+    // Filter entries for current week.
+    // Manual week-type overrides from the Planner (customEntries) are applied
+    // first — the scraper marks some alternating group-split labs as 'all',
+    // and the user's correction must win here, not just in the Planner view.
     const filteredEntries = useMemo(() => {
         // Source is either user selections (if any) or default entries
         const source = userSelections.length > 0 ? userSelectedEntries : timetableEntries;
 
-        return source.filter(
-            entry => entry.week_type === 'all' || entry.week_type === currentWeekType
-        );
-    }, [userSelections.length, userSelectedEntries, timetableEntries, currentWeekType]);
+        return source
+            .map(entry => {
+                const override = customEntries[entry.id]?.week_type;
+                return override && override !== entry.week_type
+                    ? { ...entry, week_type: override }
+                    : entry;
+            })
+            .filter(entry => entry.week_type === 'all' || entry.week_type === currentWeekType);
+    }, [userSelections.length, userSelectedEntries, timetableEntries, currentWeekType, customEntries]);
+
+    // Image export — delegate to export module
+    const handleExportImage = useCallback(async () => {
+        try {
+            const weekLabel = 'Páros és páratlan hét';
+            const dateStr = new Date().toLocaleDateString('hu-HU',
+                { year: 'numeric', month: 'long', day: 'numeric' });
+            const exportTitle = selectedClass?.name || selectedTeacher?.name || 'UniTimetable';
+            const fileName = `${exportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+
+            // Lazy: the export pipeline drags in @react-pdf/renderer + pdfjs-dist
+            // (~1.5 MB min) — keep it out of the initial bundle (perf budget B10)
+            const { exportTimetableImage } = await import('../export');
+            await exportTimetableImage({
+                entries: entriesToDisplay,
+                title: exportTitle,
+                weekLabel,
+                dateLabel: dateStr,
+                selectedClassId: selectedClass?.id,
+                downloadFileName: fileName,
+            });
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('A kép exportálása nem sikerült.');
+        }
+    }, [selectedClass, selectedTeacher, entriesToDisplay]);
+
+    // Wire up export ref so App.tsx dock button can trigger it
+    useEffect(() => {
+        if (onExportRef) onExportRef.current = handleExportImage;
+        return () => { if (onExportRef) onExportRef.current = null; };
+    }, [onExportRef, handleExportImage]);
 
     // Grouping computation moved directly to renderer below
 
@@ -186,159 +274,168 @@ export default function Timetable() {
         );
     }
 
-    // Render for Web (Standard Grid)
+    // Shared week indicator chip (used in both desktop corner and mobile header)
+    const weekChip = (
+        <div className="week-indicator-chip" data-week={currentWeekType === 'odd' || currentWeekType === 'even' ? currentWeekType : 'break'}>
+            <span className="week-indicator-dot" />
+            <span className="week-indicator-label">
+                {currentWeekType === 'odd' ? 'Páratlan' : currentWeekType === 'even' ? 'Páros' : 'Szünet'}
+            </span>
+        </div>
+    );
+
+    // Render for Web (Standard Grid) — v3: single surface, hairline grid
+    // lines, zero scroll (SPEC_V3_PLAN.md Phase 1)
     if (!isMobile) {
         return (
-            <div className="timetable-container">
-                <div className="timetable-grid" style={{
-                    display: 'grid',
-                    gridTemplateColumns: `80px repeat(${DAYS.length}, 1fr)`,
-                    gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))`,
-                    gap: '4px',
-                    position: 'relative'
-                }}>
-                    {/* Corner cell */}
-                    <div className="glass-card" style={{ padding: '12px', textAlign: 'center', gridColumn: 1, gridRow: 1 }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                            {currentWeekType === 'odd' ? 'Páratlan' : 'Páros'} hét
-                        </span>
+            <div ref={containerRef} className={`timetable-container tt-${sizeTier}`}>
+                {sizeTier === 'too-small' ? (
+                    <div className="tt-fallback">
+                        <span className="tt-fallback-icon">📐</span>
+                        <p>Az ablak túl alacsony az órarend megjelenítéséhez.</p>
+                        <p className="tt-fallback-hint">Növeld meg az ablak magasságát.</p>
                     </div>
-
-                    {/* Day headers */}
-                    {DAYS.map((day, index) => (
-                        <div
-                            key={day}
-                            className={`day-header glass-card ${index === today ? 'today' : ''}`}
-                            style={{
-                                background: index === today
-                                    ? 'var(--accent)'
-                                    : 'var(--bg-card)',
-                                gridColumn: index + 2,
-                                gridRow: 1
-                            }}
-                        >
-                            {day}
-                            {index === today && <span style={{ fontSize: '0.7rem', marginLeft: '6px' }}>Ma</span>}
+                ) : (
+                    <div ref={gridRef} className="timetable-grid tt-grid" style={{
+                        gridTemplateColumns: `76px repeat(${dayCount}, 1fr)`,
+                        gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))`,
+                    }}>
+                        {/* Corner cell — week indicator */}
+                        <div className="tt-corner" style={{ gridColumn: 1, gridRow: 1 }}>
+                            {weekChip}
                         </div>
-                    ))}
 
-                    {/* Time slots backgrounds */}
-                    {TIME_SLOTS.map((slot, slotIndex) => {
-                        return (
-                            <div key={`slot-row-${slotIndex}`} style={{ display: 'contents' }}>
-                                {/* Time cell */}
-                                <div className="time-cell glass-card" style={{ gridColumn: 1, gridRow: slotIndex + 2 }}>
-                                    <span className="time-label">{slot.label}</span>
-                                    <span className="time-range">{slot.start}</span>
-                                    <span className="time-range">{slot.end}</span>
-                                </div>
+                        {/* Day headers */}
+                        {visibleDays.map((day, index) => (
+                            <div
+                                key={day}
+                                className={`day-header ${index === today ? 'today' : ''}`}
+                                style={{ gridColumn: index + 2, gridRow: 1 }}
+                            >
+                                {day}
+                                {index === today && <span className="day-header-today-badge">Ma</span>}
+                            </div>
+                        ))}
 
-                                {/* Day cells (Backgrounds) */}
-                                {DAYS.map((_, dayIndex) => {
-                                    return (
+                        {/* Time column + grid line cells */}
+                        {TIME_SLOTS.map((slot, slotIndex) => {
+                            return (
+                                <div key={`slot-row-${slotIndex}`} style={{ display: 'contents' }}>
+                                    <div className="time-cell tnum" style={{ gridColumn: 1, gridRow: slotIndex + 2 }}>
+                                        <span className="time-label">{slot.label}</span>
+                                        <span className="time-range">{slot.start}</span>
+                                        <span className="time-range">{slot.end}</span>
+                                    </div>
+
+                                    {visibleDays.map((_, dayIndex) => (
                                         <div
                                             key={`slot-bg-${dayIndex}-${slotIndex}`}
                                             className="slot-cell"
-                                            style={{
-                                                background: 'var(--bg-secondary)',
-                                                gridColumn: dayIndex + 2,
-                                                gridRow: slotIndex + 2
-                                            }}
+                                            style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}
                                         ></div>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })}
-
-                    {/* Render Classes */}
-                    {(() => {
-                        const grouped = new Map<string, AvailableClassEntry[]>();
-                        filteredEntries.forEach(entry => {
-                            if (entry.day_of_week === undefined) return;
-
-                            let startSlot = -1;
-                            let endSlot = -1;
-                            TIME_SLOTS.forEach((_, i) => {
-                                const slotStart = getMinutes(TIME_SLOTS[i].start);
-                                const slotEnd = getMinutes(TIME_SLOTS[i].end);
-                                const entryStart = getMinutes(entry.start_time);
-                                const entryEnd = getMinutes(entry.end_time);
-
-                                if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
-                                    if (startSlot === -1) startSlot = i;
-                                    endSlot = i;
-                                }
-                            });
-
-                            if (startSlot === -1) return;
-                            const span = endSlot - startSlot + 1;
-                            (entry as any)._calculatedSpan = span;
-
-                            const key = `${entry.day_of_week}-${startSlot}`;
-                            if (!grouped.has(key)) grouped.set(key, []);
-                            grouped.get(key)!.push(entry);
-                        });
-
-                        return Array.from(grouped.entries()).map(([key, groupEntries]) => {
-                            const [day, startSlot] = key.split('-').map(Number);
-                            const maxSpan = Math.max(...groupEntries.map(e => (e as any)._calculatedSpan));
-
-                            return (
-                                <div
-                                    key={`class-group-${key}`}
-                                    style={{
-                                        gridRow: `${startSlot + 2} / span ${maxSpan}`,
-                                        gridColumn: `${day + 2} / span 1`,
-                                        zIndex: 10,
-                                        display: 'flex',
-                                        flexDirection: 'row',
-                                        gap: '4px',
-                                    }}
-                                >
-                                    {groupEntries.map(entry => (
-                                        <div key={entry.id} style={{ flex: 1, minWidth: 0, height: '100%' }}>
-                                            <ClassCard
-                                                data={{
-                                                    id: entry.id,
-                                                    subjectName: entry.subject_name,
-                                                    teacherName: entry.teacher_name,
-                                                    teacherCode: entry.teacher_code,
-                                                    classroom: entry.classroom,
-                                                    className: entry.class_name,
-                                                }}
-                                                showTeacher={true}
-                                                showRoom={true}
-                                                showClassName={entry.class_id !== selectedClass?.id}
-                                                variant="default"
-                                            />
-                                        </div>
                                     ))}
                                 </div>
                             );
-                        });
-                    })()}
+                        })}
 
-                    {/* Time Line Overlay */}
-                    {today >= 0 && today < 5 && (
-                        <div
-                            style={{
-                                gridArea: `2 / ${today + 2} / 8 / ${today + 3}`,
-                                position: 'absolute',
-                                width: '100%',
-                                height: '100%',
-                                pointerEvents: 'none',
-                                zIndex: 200,
-                                overflow: 'hidden'
-                            }}
-                        >
-                            <TimeLine
-                                show={preferences.showTimeIndicator}
-                                currentTime={currentTime}
-                            />
-                        </div>
-                    )}
-                </div>
+                        {/* Render Classes */}
+                        {(() => {
+                            const grouped = new Map<string, AvailableClassEntry[]>();
+                            filteredEntries.forEach(entry => {
+                                if (entry.day_of_week === undefined) return;
+
+                                let startSlot = -1;
+                                let endSlot = -1;
+                                TIME_SLOTS.forEach((_, i) => {
+                                    const slotStart = getMinutes(TIME_SLOTS[i].start);
+                                    const slotEnd = getMinutes(TIME_SLOTS[i].end);
+                                    const entryStart = getMinutes(entry.start_time);
+                                    const entryEnd = getMinutes(entry.end_time);
+
+                                    if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
+                                        if (startSlot === -1) startSlot = i;
+                                        endSlot = i;
+                                    }
+                                });
+
+                                if (startSlot === -1) return;
+                                const span = endSlot - startSlot + 1;
+                                (entry as any)._calculatedSpan = span;
+
+                                const key = `${entry.day_of_week}-${startSlot}`;
+                                if (!grouped.has(key)) grouped.set(key, []);
+                                grouped.get(key)!.push(entry);
+                            });
+
+                            return Array.from(grouped.entries()).map(([key, groupEntries]) => {
+                                const [day, startSlot] = key.split('-').map(Number);
+                                const maxSpan = Math.max(...groupEntries.map(e => (e as any)._calculatedSpan));
+
+                                return (
+                                    <div
+                                        key={`class-group-${key}`}
+                                        className="tt-event-stack"
+                                        style={{
+                                            gridRow: `${startSlot + 2} / span ${maxSpan}`,
+                                            gridColumn: `${day + 2} / span 1`,
+                                        }}
+                                    >
+                                        {groupEntries.map(entry => (
+                                            <motion.div
+                                                key={entry.id}
+                                                layoutId={`tt-card-${entry.id}`}
+                                                className="tt-card-cell"
+                                                style={{ flex: 1, minWidth: 0, height: '100%' }}
+                                            >
+                                                <ClassCard
+                                                    data={{
+                                                        id: entry.id,
+                                                        subjectName: entry.subject_name,
+                                                        teacherName: entry.teacher_name,
+                                                        teacherCode: entry.teacher_code,
+                                                        classroom: entry.classroom,
+                                                        className: entry.class_name,
+                                                    }}
+                                                    showTeacher={true}
+                                                    showRoom={true}
+                                                    showClassName={entry.class_id !== selectedClass?.id}
+                                                    variant="default"
+                                                    onClick={() => setDetailEntry(entry)}
+                                                />
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                );
+                            });
+                        })()}
+
+                        {/* Time Line Overlay */}
+                        {today >= 0 && today < dayCount && (
+                            <div
+                                style={{
+                                    gridArea: `2 / ${today + 2} / 8 / ${today + 3}`,
+                                    position: 'absolute',
+                                    width: '100%',
+                                    height: '100%',
+                                    pointerEvents: 'none',
+                                    zIndex: 200,
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                <TimeLine
+                                    show={preferences.showTimeIndicator}
+                                    currentTime={currentTime}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <ClassDetailModal
+                    entry={detailEntry}
+                    layoutId={detailEntry ? `tt-card-${detailEntry.id}` : undefined}
+                    onClose={() => setDetailEntry(null)}
+                />
             </div>
         );
     }
@@ -381,7 +478,7 @@ export default function Timetable() {
                 >
                     <div className="mobile-day-column" style={{ height: '100%' }}>
                         <div className="mobile-timetable-grid" style={{ gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))` }}>
-                            {/* Header row for mobile grid */}
+                            {/* Header row for mobile grid — week chip */}
                             <div className="glass-card" style={{
                                 gridColumn: 1,
                                 gridRow: 1,
@@ -389,12 +486,9 @@ export default function Timetable() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 padding: '4px',
-                                fontSize: '0.6rem',
-                                color: 'var(--text-secondary)',
-                                textAlign: 'center',
-                                borderRadius: '12px'
+                                borderRadius: 'var(--radius-md)',
                             }}>
-                                {currentWeekType === 'odd' ? 'Páratlan' : 'Páros'}
+                                {weekChip}
                             </div>
                             <div className={`mobile-day-header glass-card ${currentDayIndex === today ? 'today' : ''}`}
                                 style={{
@@ -475,6 +569,7 @@ export default function Timetable() {
                                                         showTeacher={true}
                                                         showRoom={true}
                                                         variant="compact"
+                                                        onClick={() => setDetailEntry(entry)}
                                                     />
                                                 </div>
                                             ))}
@@ -502,6 +597,13 @@ export default function Timetable() {
                     </div>
                 </motion.div>
             </AnimatePresence>
+
+            {/* No layoutId on mobile — the carousel's popLayout animation
+                owns the cards, so the window uses a plain scale-in */}
+            <ClassDetailModal
+                entry={detailEntry}
+                onClose={() => setDetailEntry(null)}
+            />
         </div>
     );
 }
@@ -579,13 +681,5 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
             )}
         </AnimatePresence>
     );
-}
-
-function usePrevious(value: boolean) {
-    const ref = useRef<boolean>(value);
-    useEffect(() => {
-        ref.current = value;
-    });
-    return ref.current;
 }
 

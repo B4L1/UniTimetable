@@ -4,17 +4,28 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { googleLogout } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
-import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass, fetchTimetableEntriesByIds, fetchTimetableEntries } from '@shared/index';
-import type { ClassData, BackgroundTheme } from '@shared/lib/types';
+import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass } from '@shared/index';
+import type { ClassData, ColorTheme, BackgroundEffect } from '@shared/lib/types';
+import {
+    useBackgroundEffect, setBackgroundEffect,
+    hasAcknowledgedPerfWarning, acknowledgePerfWarning,
+    prefersReducedMotion,
+} from '../utils/backgroundEffect';
 
-const BACKGROUND_THEMES: { id: BackgroundTheme; label: string; icon: string }[] = [
-    { id: 'none', label: 'Sötét', icon: '🌑' },
+const COLOR_THEMES: { id: ColorTheme; label: string; icon: string; secret?: boolean }[] = [
+    { id: 'light', label: 'Világos (Sapientia)', icon: '🏛️' },
+    { id: 'dark', label: 'Sötét', icon: '🌑' },
+    { id: 'dark-glass', label: 'Sötét üveg', icon: '🧊' },
+    { id: 'terminal', label: 'Faulty Terminal', icon: '💻', secret: true },
+];
+
+const BACKGROUND_EFFECTS: { id: BackgroundEffect; label: string; icon: string; secret?: boolean }[] = [
+    { id: 'none', label: 'Nincs', icon: '✨' },
     { id: 'aurora', label: 'Aurora', icon: '🌌' },
     { id: 'pixel-blast', label: 'Pixel Blast', icon: '👾' },
     { id: 'iridescence', label: 'Iridescence', icon: '🌈' },
     { id: 'liquid-chrome', label: 'Liquid Chrome', icon: '💎' },
-    { id: 'sapientia', label: 'Sapientia', icon: '🏛️' },
-    { id: 'faulty-terminal', label: 'Faulty Terminal', icon: '💻' },
+    { id: 'faulty-terminal', label: 'Faulty Terminal', icon: '📟', secret: true },
 ];
 
 interface SettingsProps {
@@ -24,8 +35,23 @@ interface SettingsProps {
 export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
     const { preferences, updatePreferences, selectedClass, setSelectedClass, setFirstLaunchComplete, logout, user } = useAppStore();
     const navigate = useNavigate();
-    const [showBgDropdown, setShowBgDropdown] = useState(false);
+    const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+    const [showEffectDropdown, setShowEffectDropdown] = useState(false);
     const [showClassSelector, setShowClassSelector] = useState(false);
+    const backgroundEffect = useBackgroundEffect();
+    const reducedMotion = prefersReducedMotion();
+
+    const handleEffectSelect = (effect: BackgroundEffect) => {
+        if (effect !== 'none' && !hasAcknowledgedPerfWarning()) {
+            const ok = confirm(
+                'Az animált hátterek grafikus effekteket használnak, ami régebbi vagy gyengébb eszközökön lassíthatja az alkalmazást.\n\nBiztosan bekapcsolod?'
+            );
+            if (!ok) return;
+            acknowledgePerfWarning();
+        }
+        setBackgroundEffect(effect);
+        setShowEffectDropdown(false);
+    };
 
     // Class selection state
     const [classes, setClasses] = useState<ClassData[]>([]);
@@ -60,74 +86,6 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
         }
     };
 
-    // --- Export / Import Backup ---
-    const handleExport = async () => {
-        const state = useAppStore.getState();
-        let finalEntries = state.timetableEntries;
-
-        try {
-            if (state.userSelections && state.userSelections.length > 0) {
-                // Fetch specific selections (planner mode)
-                finalEntries = await fetchTimetableEntriesByIds(state.userSelections);
-            } else if (finalEntries.length === 0 && state.selectedClass?.id) {
-                // Fetch full cohort if cache was empty
-                finalEntries = await fetchTimetableEntries(state.selectedClass.id);
-            }
-        } catch (err) {
-            console.error('Failed to fully populate timetable entries before export:', err);
-        }
-
-        const exportData = {
-            selectedClass: state.selectedClass,
-            timetableEntries: finalEntries,
-            userSelections: state.userSelections,
-            preferences: state.preferences,
-            importedSubjects: state.importedSubjects,
-            isFaultyTerminalUnlocked: state.isFaultyTerminalUnlocked
-        };
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `unitimetable-backup-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
-    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = JSON.parse(e.target?.result as string);
-
-                if (data && typeof data === 'object') {
-                    const store = useAppStore.getState();
-
-                    if (data.selectedClass !== undefined) await store.setSelectedClass(data.selectedClass);
-                    if (data.timetableEntries !== undefined) store.setTimetableEntries(data.timetableEntries);
-                    if (data.userSelections !== undefined) await store.setSelections(data.userSelections);
-                    if (data.preferences !== undefined) await store.updatePreferences(data.preferences);
-                    if (data.importedSubjects !== undefined) await store.setImportedSubjects(data.importedSubjects);
-                    if (data.isFaultyTerminalUnlocked !== undefined) await store.setFaultyTerminalUnlocked(data.isFaultyTerminalUnlocked);
-
-                    await store.initialize();
-                    alert('Sikeres adatvisszaállítás!');
-                } else {
-                    alert('Érvénytelen fájlformátum.');
-                }
-            } catch (error) {
-                console.error('Import failed:', error);
-                alert('Hiba történt az importálás során. Hibás JSON formátum.');
-            }
-        };
-        reader.readAsText(file);
-        e.target.value = ''; // Reset input so the same file can be selected again
-    };
 
     // Easter Egg Logic
     const { isFaultyTerminalUnlocked, setFaultyTerminalUnlocked } = useAppStore();
@@ -141,7 +99,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
 
         if (newCount === 10) {
             await setFaultyTerminalUnlocked(true);
-            await updatePreferences({ backgroundTheme: 'faulty-terminal' });
+            await updatePreferences({ colorTheme: 'terminal' });
             alert("SYSTEM FAILURE IMMINENT... Theme unlocked.");
             setVersionClickCount(0);
         }
@@ -161,73 +119,91 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
         navigate('/login');
     };
 
-    const regularThemes = BACKGROUND_THEMES.filter(t => t.id !== 'faulty-terminal');
-    const secretThemes = BACKGROUND_THEMES.filter(t => t.id === 'faulty-terminal');
+    const visibleThemes = COLOR_THEMES.filter(t => !t.secret || isFaultyTerminalUnlocked);
+    const visibleEffects = BACKGROUND_EFFECTS.filter(t => !t.secret || isFaultyTerminalUnlocked);
 
     return (
         <div className="settings-container">
-            {/* Background Theme */}
+            {/* Color theme + background effect */}
             <div className="settings-section">
-                <h2>Háttér</h2>
+                <h2>Megjelenés</h2>
                 <div className="settings-card glass-card">
+                    {/* Color theme (synced token map) */}
                     <div
                         className="settings-row"
-                        onClick={() => setShowBgDropdown(!showBgDropdown)}
+                        onClick={() => { setShowThemeDropdown(!showThemeDropdown); setShowEffectDropdown(false); }}
                     >
                         <div className="settings-label">
                             <span>🎨</span>
-                            <span>Háttér téma</span>
+                            <span>Téma</span>
                         </div>
                         <div className="settings-value">
-                            {BACKGROUND_THEMES.find(t => t.id === preferences.backgroundTheme)?.label || 'Nincs'}
-                            <span style={{ marginLeft: 8 }}>{showBgDropdown ? '▲' : '▼'}</span>
+                            {COLOR_THEMES.find(t => t.id === preferences.colorTheme)?.label || 'Világos'}
+                            <span style={{ marginLeft: 8 }}>{showThemeDropdown ? '▲' : '▼'}</span>
                         </div>
                     </div>
-                    {showBgDropdown && (
+                    {showThemeDropdown && (
                         <div className="dropdown-content">
-                            {regularThemes.map((theme) => (
+                            {visibleThemes.map((theme) => (
                                 <div
                                     key={theme.id}
-                                    className={`dropdown-option ${preferences.backgroundTheme === theme.id ? 'selected' : ''}`}
+                                    className={`dropdown-option ${preferences.colorTheme === theme.id ? 'selected' : ''}`}
                                     onClick={() => {
-                                        updatePreferences({ backgroundTheme: theme.id });
-                                        setShowBgDropdown(false);
+                                        updatePreferences({ colorTheme: theme.id });
+                                        setShowThemeDropdown(false);
                                     }}
+                                    style={theme.secret ? { color: '#0f0', fontFamily: 'monospace' } : undefined}
                                 >
                                     <span>{theme.icon} {theme.label}</span>
-                                    {preferences.backgroundTheme === theme.id && <span>✓</span>}
+                                    {preferences.colorTheme === theme.id && <span>✓</span>}
                                 </div>
                             ))}
+                        </div>
+                    )}
 
-                            {isFaultyTerminalUnlocked && secretThemes.length > 0 && (
-                                <>
-                                    <div style={{ padding: '8px 12px', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', borderTop: '1px solid var(--border)', marginTop: '4px' }}>
-                                        Corrupted Data
-                                    </div>
-                                    {secretThemes.map((theme) => (
-                                        <div
-                                            key={theme.id}
-                                            className={`dropdown-option ${preferences.backgroundTheme === theme.id ? 'selected' : ''}`}
-                                            onClick={() => {
-                                                updatePreferences({ backgroundTheme: theme.id });
-                                                setShowBgDropdown(false);
-                                            }}
-                                            style={{ color: '#0f0', fontFamily: 'monospace' }}
-                                        >
-                                            <span>{theme.icon} {theme.label}</span>
-                                            {preferences.backgroundTheme === theme.id && <span>✓</span>}
-                                        </div>
-                                    ))}
-                                </>
-                            )}
+                    {/* Animated background effect (device-local, perf warning) */}
+                    <div
+                        className="settings-row"
+                        style={{ borderTop: '1px solid var(--border)', opacity: reducedMotion ? 0.5 : 1 }}
+                        onClick={() => { if (!reducedMotion) { setShowEffectDropdown(!showEffectDropdown); setShowThemeDropdown(false); } }}
+                    >
+                        <div className="settings-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span>🌠</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span>Animált háttér</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'normal', marginTop: '2px' }}>
+                                    {reducedMotion
+                                        ? 'Kikapcsolva (csökkentett mozgás beállítás aktív)'
+                                        : 'Gyengébb eszközökön lassíthatja az alkalmazást · csak ezen az eszközön'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="settings-value">
+                            {BACKGROUND_EFFECTS.find(t => t.id === backgroundEffect)?.label || 'Nincs'}
+                            {!reducedMotion && <span style={{ marginLeft: 8 }}>{showEffectDropdown ? '▲' : '▼'}</span>}
+                        </div>
+                    </div>
+                    {showEffectDropdown && !reducedMotion && (
+                        <div className="dropdown-content">
+                            {visibleEffects.map((effect) => (
+                                <div
+                                    key={effect.id}
+                                    className={`dropdown-option ${backgroundEffect === effect.id ? 'selected' : ''}`}
+                                    onClick={() => handleEffectSelect(effect.id)}
+                                    style={effect.secret ? { color: '#0f0', fontFamily: 'monospace' } : undefined}
+                                >
+                                    <span>{effect.icon} {effect.label}</span>
+                                    {backgroundEffect === effect.id && <span>✓</span>}
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Appearance */}
+            {/* Timetable display options */}
             <div className="settings-section">
-                <h2>Megjelenés</h2>
+                <h2>Órarend</h2>
                 <div className="settings-card glass-card">
                     <div
                         className="settings-row"
@@ -288,7 +264,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                     setSelectedYear(null);
                                     setSelectedGroup('');
                                 }}
-                                style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                                style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
                             >
                                 <option value="">Válassz szakot...</option>
                                 {faculties.map(f => <option key={f} value={f}>{f}</option>)}
@@ -302,7 +278,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                         setSelectedYear(Number(e.target.value));
                                         setSelectedGroup('');
                                     }}
-                                    style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                                    style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
                                 >
                                     <option value="">Válassz évet...</option>
                                     {years.map(y => <option key={y} value={y}>{y}. év</option>)}
@@ -314,7 +290,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                 <select
                                     value={selectedGroup}
                                     onChange={(e) => setSelectedGroup(e.target.value)}
-                                    style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                                    style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
                                 >
                                     <option value="">Válassz csoportot...</option>
                                     {groups.map(g => <option key={g} value={g}>{g}</option>)}
@@ -380,45 +356,6 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                 </div>
             </div>
 
-            {/* Backup & Restore */}
-            <div className="settings-section">
-                <h2>Adatmentés</h2>
-                <div className="settings-card glass-card">
-                    <div
-                        className="settings-row clickable"
-                        onClick={handleExport}
-                    >
-                        <div className="settings-label">
-                            <span>💾</span>
-                            <span>Mentés exportálása fájlba</span>
-                        </div>
-                        <div className="settings-value">
-                            <span>›</span>
-                        </div>
-                    </div>
-
-                    <div
-                        className="settings-row clickable"
-                        style={{ borderTop: '1px solid var(--border)' }}
-                        onClick={() => document.getElementById('import-file-upload')?.click()}
-                    >
-                        <div className="settings-label">
-                            <span>📂</span>
-                            <span>Mentés importálása fájlból</span>
-                        </div>
-                        <div className="settings-value">
-                            <span>›</span>
-                        </div>
-                        <input
-                            id="import-file-upload"
-                            type="file"
-                            accept=".json"
-                            style={{ display: 'none' }}
-                            onChange={handleImport}
-                        />
-                    </div>
-                </div>
-            </div>
 
             {/* Version - Easter Egg Target */}
             <div className="settings-section">

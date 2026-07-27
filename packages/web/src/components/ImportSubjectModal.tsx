@@ -104,7 +104,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid var(--border)',
-        borderRadius: '16px',
+        borderRadius: 'var(--radius-lg)',
         width: '100%',
         maxWidth: '500px',
         maxHeight: '90vh',
@@ -142,7 +142,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
         maxHeight: isOpen ? '1000px' : '0px',
         opacity: isOpen ? 1 : 0,
         overflow: 'hidden',
-        transition: 'all 0.3s ease-in-out',
+        transition: 'all 0.3s var(--ease)',
         padding: isOpen ? '0 16px 16px 16px' : '0 16px'
     });
 
@@ -160,7 +160,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                     </p>
 
                     {/* IMPORT SECTION */}
-                    <div style={{ marginBottom: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <div style={{ marginBottom: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                         <button
                             onClick={() => setIsImportOpen(!isImportOpen)}
                             style={{
@@ -175,7 +175,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                             </span>
                             <span style={{ 
                                 transform: isImportOpen ? 'rotate(90deg)' : 'rotate(0deg)', 
-                                transition: 'transform 0.3s' 
+                                transition: 'transform 0.3s var(--ease)'
                             }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                             </span>
@@ -191,7 +191,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                                     style={{
-                                        flex: 1, padding: '12px', borderRadius: '10px',
+                                        flex: 1, padding: '12px', borderRadius: 'var(--radius-md)',
                                         background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)',
                                         border: '1px solid var(--border)', outline: 'none', fontSize: '0.95rem'
                                     }}
@@ -200,7 +200,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                                     className="btn btn-primary"
                                     onClick={handleSearch}
                                     disabled={isImportLoading || searchQuery.trim().length < 2}
-                                    style={{ padding: '0 16px', borderRadius: '10px', fontSize: '0.9rem' }}
+                                    style={{ padding: '0 16px', borderRadius: 'var(--radius-md)', fontSize: '0.9rem' }}
                                 >
                                     {isImportLoading ? '...' : 'Keresés'}
                                 </button>
@@ -210,7 +210,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                             {searchResults.length > 0 && (
                                 <div style={{
                                     maxHeight: '250px', overflowY: 'auto', marginBottom: '16px',
-                                    background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '8px',
+                                    background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', padding: '8px',
                                     border: '1px solid rgba(255,255,255,0.05)'
                                 }}>
                                     {searchResults.map(entry => {
@@ -220,7 +220,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                                                 display: 'flex', alignItems: 'center', padding: '12px',
                                                 cursor: isAlreadyImported ? 'default' : 'pointer',
                                                 borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '12px',
-                                                opacity: isAlreadyImported ? 0.5 : 1, transition: 'background 0.2s', borderRadius: '8px'
+                                                opacity: isAlreadyImported ? 0.5 : 1, transition: 'background var(--transition)', borderRadius: 'var(--radius-sm)'
                                             }}>
                                                 <input
                                                     type="checkbox"
@@ -255,7 +255,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                                     className="btn btn-primary"
                                     onClick={handleImportConfirm}
                                     disabled={isImportLoading}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px' }}
+                                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)' }}
                                 >
                                     {isImportLoading ? 'Mentés...' : `${selectedSubjects.length} tárgy felvétele`}
                                 </button>
@@ -263,13 +263,13 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
 
                             {/* Currently Imported */}
                             {importedSubjects.length > 0 && (
-                                <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', padding: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500 }}>Saját importált tárgyak:</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                         {importedSubjects.map(sub => (
                                             <span key={`imported-${sub}`} style={{
                                                 fontSize: '0.8rem', background: 'var(--accent)', color: 'white',
-                                                padding: '4px 10px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500
+                                                padding: '4px 10px', borderRadius: 'var(--radius-pill)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500
                                             }}>
                                                 {sub}
                                                 <button
@@ -285,7 +285,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                     </div>
 
                     {/* REMOVE SECTION */}
-                    <div style={{ marginBottom: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <div style={{ marginBottom: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                         <button
                             onClick={() => setIsRemoveOpen(!isRemoveOpen)}
                             style={{
@@ -300,7 +300,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                             </span>
                             <span style={{ 
                                 transform: isRemoveOpen ? 'rotate(90deg)' : 'rotate(0deg)', 
-                                transition: 'transform 0.3s' 
+                                transition: 'transform 0.3s var(--ease)'
                             }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                             </span>
@@ -314,7 +314,7 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                                         {activeSubjects.map(sub => (
                                             <span key={`active-${sub}`} style={{
                                                 fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)',
-                                                padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255,255,255,0.1)'
+                                                padding: '6px 12px', borderRadius: 'var(--radius-pill)', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255,255,255,0.1)'
                                             }}>
                                                 {sub}
                                                 <button
@@ -338,13 +338,13 @@ export default function ImportSubjectModal({ isOpen, onClose }: ImportSubjectMod
                             )}
 
                             {removedSubjects.length > 0 && (
-                                <div style={{ marginTop: '16px', background: 'rgba(239, 68, 68, 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                                <div style={{ marginTop: '16px', background: 'rgba(239, 68, 68, 0.05)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500 }}>Eltávolított (elrejtett) tárgyak:</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                         {removedSubjects.map(sub => (
                                             <span key={`removed-${sub}`} style={{
                                                 fontSize: '0.85rem', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error, #ef4444)',
-                                                padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500
+                                                padding: '6px 12px', borderRadius: 'var(--radius-pill)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500
                                             }}>
                                                 {sub}
                                                 <button

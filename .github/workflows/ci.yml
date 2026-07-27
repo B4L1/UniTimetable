@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (web)
+        run: pnpm --filter @unitimetable/web typecheck
+
+      # Non-blocking until the pre-v3 lint debt is cleared (SPEC_V3_PLAN.md
+      # Phase 7) — legacy files carry ~30 errors (any-typed props, ref-in-render
+      # patterns). New code must lint clean; reviewers check this step manually.
+      - name: Lint (web, informational)
+        run: pnpm --filter @unitimetable/web lint
+        continue-on-error: true
+
+      - name: Test (shared)
+        run: pnpm --filter @unitimetable/shared test
+
+      - name: Build (web)
+        run: pnpm --filter @unitimetable/web build

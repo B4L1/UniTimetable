@@ -1,72 +1,128 @@
 @import "tailwindcss";
 @import "./themes/sapientia.css";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS (spec v3, B9/B10)
+
+   Components consume ONLY semantic tokens. A color theme is a token map:
+     :root                    dark (base values)
+     [data-theme='light']     Sapientia light (themes/sapientia.css)
+     [data-theme='dark']      = :root
+     [data-theme='dark-glass'] dark + translucent surfaces
+     [data-theme='terminal']  easter egg
+   Seasonal themes (christmas, easter, …) = one more token block, nothing else.
+   ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Colors - Dark Theme */
-  --bg-primary: #12121a;
-  --bg-secondary: #181824;
-  --bg-card: #1a1a24;
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0b0;
+  /* Semantic colors — dark theme base (spec §4.1) */
+  --bg-app: #020617;
+  --bg-surface: #0f172a;
+  --bg-elevated: #1e293b;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --grid-line: rgba(255, 255, 255, 0.05);
+  --text-primary: #f1f5f9;
+  --text-secondary: #a7b4c6;
+  --text-tertiary: #76839a;
   --accent: #6366f1;
   --accent-hover: #818cf8;
-  --border: rgba(255, 255, 255, 0.1);
-  --error: #ef4444;
+  --accent-subtle: rgba(99, 102, 241, 0.16);
+  --danger: #ef4444;
+  --warning: #f59e0b;
   --success: #22c55e;
 
-  /* Glass effects - More solid frosty look */
-  --glass-bg: rgba(20, 20, 28, 0.8);
+  /* Glass tokens — used by modals everywhere, and by surfaces only in
+     the dark-glass theme */
+  --glass-bg: rgba(15, 23, 42, 0.8);
   --glass-border: rgba(255, 255, 255, 0.12);
 
-  /* ── Design tokens ─────────────────────────────
-     Radius scale (mirrors Apple's continuous-corner feel)
-     xs  → tiny chips/labels
-     sm  → small inline controls
-     md  → buttons, inputs, standalone controls
-     lg  → cards, panels, dropdowns, modals
-  ──────────────────────────────────────────────── */
+  /* Spacing scale (spec §3.1 — no arbitrary values) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Radius scale (spec §3.2) */
   --radius-xs:   6px;
   --radius-sm:   8px;
   --radius-md:  12px;
   --radius-lg:  16px;
   --radius-pill: 9999px;
 
-  /* Shadow scale */
+  /* Shadow scale — elevation only (borders define structure, B10.2) */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.14), 0 1px 2px rgba(0,0,0,0.08);
   --shadow-md: 0 4px 14px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.10);
   --shadow-lg: 0 12px 32px rgba(0,0,0,0.30), 0 4px 10px rgba(0,0,0,0.12);
   --shadow-xl: 0 24px 56px rgba(0,0,0,0.40), 0 8px 20px rgba(0,0,0,0.14);
 
-  /* Transition */
+  /* Motion (B10.6: 120–200ms, springs only for spatial moves) */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
 }
 
-[data-theme='faulty-terminal'],
-body[data-theme='faulty-terminal'] {
-  --bg-primary: #050505;
-  --bg-secondary: #0a140a;
-  --bg-card: #0d1a0d;
+/* ── Legacy aliases ─────────────────────────────────────────────────────
+   Pre-v3 component CSS references these names; they resolve through the
+   semantic tokens. Remove alias by alias as components migrate (Phase 1+).
+
+   IMPORTANT: the aliases must be re-declared on body[data-theme], not just
+   :root — var() inside a custom property resolves on the element where the
+   property is DECLARED, and themes are applied to <body>. Declared only on
+   :root, --bg-primary would freeze to the dark --bg-app computed on <html>
+   and every theme's body would inherit that dark value.
+   :where() keeps specificity at zero so explicit per-theme legacy values
+   (e.g. the light theme's --border) still win. */
+:root,
+:where(body[data-theme]) {
+  --bg-primary: var(--bg-app);
+  --bg-secondary: var(--bg-surface);
+  --bg-card: var(--bg-surface);
+  --bg-tertiary: var(--bg-elevated);
+  --bg-alt: var(--bg-hover);
+  --border: var(--border-subtle);
+  --error: var(--danger);
+}
+
+/* Dark-glass: dark tokens with translucent surfaces (frosted look, opt-in) */
+[data-theme='dark-glass'],
+body[data-theme='dark-glass'] {
+  --bg-surface: rgba(15, 23, 42, 0.72);
+  --bg-elevated: rgba(30, 41, 59, 0.8);
+}
+
+/* Terminal (easter egg) */
+[data-theme='terminal'],
+body[data-theme='terminal'] {
+  --bg-app: #050505;
+  --bg-surface: #0d1a0d;
+  --bg-elevated: #102010;
+  --bg-hover: rgba(0, 255, 65, 0.08);
+  --border-subtle: rgba(0, 255, 65, 0.2);
+  --border-strong: rgba(0, 255, 65, 0.4);
+  --grid-line: rgba(0, 255, 65, 0.08);
   --text-primary: #00ff41;
-  --text-secondary: #008f11;
+  --text-secondary: #00c832;
+  --text-tertiary: #008f11;
   --accent: #00ff41;
   --accent-hover: #00ff7f;
-  --border: rgba(0, 255, 65, 0.2);
+  --accent-subtle: rgba(0, 255, 65, 0.12);
   --success: #00ff41;
-  --error: #ff0000;
+  --danger: #ff0000;
 
-  /* Overrides for glass effects */
   --glass-bg: rgba(0, 40, 0, 0.75);
   --glass-border: rgba(0, 255, 65, 0.4);
 
-  /* Override card coloring */
+  /* Card coloring: terminal renders everything monochrome green */
   --card-bg-override: rgba(0, 59, 0, 0.5);
   --card-border-override: rgba(0, 255, 65, 0.3);
   --subject-color: #00ff41 !important;
 }
 
-body[data-theme='faulty-terminal'] .dock-item.active {
-  color: var(--bg-primary) !important;
+body[data-theme='terminal'] .dock-item.active {
+  color: var(--bg-app) !important;
 }
 
 * {
@@ -113,34 +169,53 @@ body {
   animation: 0.4s var(--ease) both theme-fade-in;
 }
 
-body[data-theme='faulty-terminal'],
-body[data-theme='faulty-terminal'] * {
+body[data-theme='terminal'],
+body[data-theme='terminal'] * {
   font-family: 'VT323', monospace !important;
   text-transform: uppercase;
 }
 
-/* Glassmorphism utilities */
+/* Tabular numerals for times/counters so digits align in the grid (B10.3) */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Surface utilities ─────────────────────────────────────────────────
+   Spec §5: content surfaces are SOLID (background + subtle border + soft
+   shadow). Blur/translucency is reserved for the opt-in dark-glass theme;
+   the class names keep their historical "glass-" prefix until the Phase 1
+   component sweep renames them. */
 .glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
 }
 
 .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .glass-header {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* dark-glass theme: the frosted look users can opt into */
+body[data-theme='dark-glass'] .glass,
+body[data-theme='dark-glass'] .glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--glass-border);
+}
+
+body[data-theme='dark-glass'] .glass-header {
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom-color: var(--glass-border);
 }
 
 /* App Layout */
@@ -202,49 +277,7 @@ body[data-theme='faulty-terminal'] * {
   white-space: nowrap;
 }
 
-/* Header Navigation */
-.header-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition);
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.nav-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-}
-
-.nav-btn.active {
-  background: var(--accent);
-  color: white;
-  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
-}
-
 @media (max-width: 640px) {
-  .nav-label {
-    display: none;
-  }
-
-  .nav-btn {
-    padding: 8px 12px;
-  }
-
   .app-header h1 {
     font-size: 1.1rem;
   }
@@ -283,6 +316,52 @@ body[data-theme='faulty-terminal'] * {
   gap: 2px;
   min-width: 180px;
 }
+
+/* ── Week indicator chip ─────────────────────────────────────────── */
+.week-indicator-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px 2px 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.week-indicator-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.week-indicator-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.week-indicator-chip[data-week='odd']   { border-color: rgba(99,102,241,0.35); background: rgba(99,102,241,0.1); color: #a5b4fc; }
+.week-indicator-chip[data-week='odd']   .week-indicator-dot { background: #6366f1; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
+
+.week-indicator-chip[data-week='even']  { border-color: rgba(168,85,247,0.35); background: rgba(168,85,247,0.1); color: #d8b4fe; }
+.week-indicator-chip[data-week='even']  .week-indicator-dot { background: #a855f7; box-shadow: 0 0 6px rgba(168,85,247,0.6); }
+
+.week-indicator-chip[data-week='break'] { border-color: rgba(234,179,8,0.3); background: rgba(234,179,8,0.08); color: #fde68a; }
+.week-indicator-chip[data-week='break'] .week-indicator-dot { background: #eab308; }
+
+/* Sapientia light-mode overrides */
+body[data-theme='light'] .week-indicator-chip[data-week='odd']  { border-color: rgba(10,108,66,0.3); background: rgba(10,108,66,0.08); color: var(--sap-green); }
+body[data-theme='light'] .week-indicator-chip[data-week='odd']  .week-indicator-dot { background: var(--sap-green); box-shadow: 0 0 6px rgba(10,108,66,0.4); }
+body[data-theme='light'] .week-indicator-chip[data-week='even'] { border-color: rgba(0,84,166,0.3); background: rgba(0,84,166,0.08); color: var(--sap-blue); }
+body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-dot { background: var(--sap-blue); box-shadow: 0 0 6px rgba(0,84,166,0.4); }
 
 .day-header {
   padding: 12px 16px;
@@ -400,7 +479,7 @@ body[data-theme='faulty-terminal'] * {
     margin-bottom: 2px;
     padding: 8px;
     text-align: center;
-    font-weight: 700;
+    font-weight: 600;
     border-radius: var(--radius-sm);
     font-size: 0.9rem;
   }
@@ -481,7 +560,7 @@ body[data-theme='faulty-terminal'] * {
   padding: 12px 16px;
   padding-left: 44px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background var(--transition);
 }
 
 .dropdown-option:hover {
@@ -618,7 +697,7 @@ select {
   color: white;
   font-size: 1rem;
   outline: none;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   appearance: none;
   cursor: pointer;
 }
@@ -696,13 +775,13 @@ select:focus {
 .toggle {
   width: 44px;
   height: 26px;
-  border-radius: 13px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   cursor: pointer;
 }
 
@@ -717,6 +796,183 @@ select:focus {
   overflow: auto;
   position: relative;
   z-index: 1;
+}
+
+/* Timetable route: the hard no-scroll constraint (spec §2.1). Planner and
+   Settings keep scrolling until their own redesign phases. */
+.app-content--fixed {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── v3 timetable grid (Phase 1) ────────────────────────────────────────
+   One solid surface, hairline internal grid lines (spec §7.2), cards float
+   on top. Replaces the gap-separated tile look. */
+.tt-grid {
+  position: relative;
+  gap: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tt-corner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tt-grid .day-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  border-left: 1px solid var(--grid-line);
+  border-radius: 0;
+  background: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tt-grid .day-header.today {
+  background: var(--accent);
+  color: #fff;
+}
+
+.day-header-today-badge {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.tt-grid .time-cell {
+  border-top: 1px solid var(--grid-line);
+  border-radius: 0;
+  background: none;
+  color: var(--text-tertiary);
+}
+
+.tt-grid .time-cell .time-label {
+  color: var(--text-secondary);
+}
+
+.tt-grid .slot-cell {
+  border-top: 1px solid var(--grid-line);
+  border-left: 1px solid var(--grid-line);
+  border-radius: 0;
+  background: none;
+}
+
+/* Event cards float above the lines, inset so the lines stay readable */
+.tt-event-stack {
+  z-index: 10;
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-1);
+  padding: 3px;
+  min-width: 0;
+}
+
+/* Each card cell is a size container: card content adapts to the height it
+   actually gets instead of overlapping (title-only when short; tap opens the
+   detail window for the rest) */
+.tt-card-cell {
+  container-type: size;
+}
+
+@container (max-height: 96px) {
+  .class-card--default .class-card-teacher {
+    display: none;
+  }
+}
+
+@container (max-height: 68px) {
+  .class-card--default .class-card-footer {
+    display: none;
+  }
+
+  .class-card--default .class-card-content {
+    justify-content: center;
+  }
+
+  .class-card--default .class-card-subject {
+    margin-bottom: 0;
+  }
+}
+
+@container (max-height: 42px) {
+  .class-card--default .class-card-subject {
+    -webkit-line-clamp: 1;
+  }
+}
+
+/* Light theme: neutralize the legacy boxed day-header look inside the grid */
+body[data-theme='light'] .tt-grid .day-header {
+  background: none;
+  border: none;
+  border-left: 1px solid var(--grid-line);
+  color: var(--sap-navy);
+}
+
+body[data-theme='light'] .tt-grid .day-header.today {
+  background: var(--sap-green);
+  border-color: var(--sap-green);
+  color: #fff;
+}
+
+/* Compact tier (spec §2.5): shrink type before ever allowing scroll */
+.tt-compact .tt-grid .day-header {
+  padding: var(--space-2) var(--space-1);
+  font-size: 0.75rem;
+}
+
+.tt-compact .tt-grid .time-cell {
+  padding: var(--space-1);
+  font-size: 0.6875rem;
+}
+
+.tt-compact .class-card {
+  padding: var(--space-1) var(--space-2);
+}
+
+.tt-compact .class-card-subject {
+  font-size: 0.6875rem;
+  margin-bottom: 2px;
+}
+
+.tt-compact .class-card-teacher,
+.tt-compact .class-card-room {
+  font-size: 0.625rem;
+}
+
+/* Fallback for absurdly small viewports (spec §2.5) */
+.tt-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  text-align: center;
+  padding: var(--space-5);
+}
+
+.tt-fallback-icon {
+  font-size: 1.5rem;
+}
+
+.tt-fallback-hint {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
 }
 
 /* Planner Styles */
@@ -786,7 +1042,7 @@ select:focus {
 }
 
 .planner-slot-cell.search-active {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  transition: border-color var(--transition), box-shadow var(--transition), opacity var(--transition);
 }
 
 .planner-slot-cell.search-active.search-match {
@@ -860,7 +1116,7 @@ select:focus {
   color: #6366f1;
   opacity: 0.4;
   font-weight: 300;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
 }
 
 .empty-slot-plus:hover span {
@@ -873,7 +1129,7 @@ select:focus {
   color: #6366f1;
   opacity: 0.4;
   font-weight: 300;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
 }
 
 .half-slot-plus:hover span {
@@ -949,7 +1205,7 @@ select:focus {
   border-radius: var(--radius-sm);
   color: white !important;
   font-size: 0.9rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--transition);
   box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
@@ -961,7 +1217,7 @@ select:focus {
   box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
 }
 
-body[data-theme='sapientia'] .dropdown-delete-btn {
+body[data-theme='light'] .dropdown-delete-btn {
   background: #ef4444 !important;
   border-color: #dc2626 !important;
 }
@@ -986,16 +1242,6 @@ body[data-theme='sapientia'] .dropdown-delete-btn {
   to {
     opacity: 1;
   }
-}
-
-.dropdown-clear-btn {
-  padding: 10px;
-  border-radius: var(--radius-sm);
-  text-align: center;
-  cursor: pointer;
-  color: var(--error);
-  font-size: 0.8rem;
-  font-weight: 500;
 }
 
 .dropdown-empty {
@@ -1037,7 +1283,7 @@ body[data-theme='sapientia'] .dropdown-delete-btn {
 
   .planner-day-column .planner-column-header {
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
     padding: 6px 12px;
     background: rgba(255, 255, 255, 0.03);
@@ -1047,7 +1293,7 @@ body[data-theme='sapientia'] .dropdown-delete-btn {
     margin-bottom: 2px;
   }
 
-  [data-theme='sapientia'] .planner-day-column .planner-column-header {
+  [data-theme='light'] .planner-day-column .planner-column-header {
     border-left-color: var(--sap-green);
   }
 
@@ -1190,7 +1436,7 @@ body[data-theme='sapientia'] .dropdown-delete-btn {
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   z-index: 200;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -1217,13 +1463,13 @@ body[data-theme='sapientia'] .dropdown-delete-btn {
   border-radius: var(--radius-sm);
   padding: 2px 6px;
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 4px;
   cursor: help;
   z-index: 10;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1233,77 +1479,77 @@ body[data-theme='sapientia'] .dropdown-delete-btn {
 }
 
 /* Faulty Terminal overrides for Planner */
-body[data-theme='faulty-terminal'] .planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
+body[data-theme='terminal'] .planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
   border-color: rgba(0, 255, 65, 0.5) !important;
   background: rgba(0, 255, 65, 0.15) !important;
 }
 
-body[data-theme='faulty-terminal'] .planner-slot-cell.clickable .empty-slot-plus:hover,
-body[data-theme='faulty-terminal'] .planner-slot-cell.clickable .half-slot-plus:hover {
+body[data-theme='terminal'] .planner-slot-cell.clickable .empty-slot-plus:hover,
+body[data-theme='terminal'] .planner-slot-cell.clickable .half-slot-plus:hover {
   background: rgba(0, 255, 65, 0.15) !important;
   color: #00ff41 !important;
 }
 
-body[data-theme='faulty-terminal'] .empty-slot-plus span,
-body[data-theme='faulty-terminal'] .half-slot-plus span {
+body[data-theme='terminal'] .empty-slot-plus span,
+body[data-theme='terminal'] .half-slot-plus span {
   color: #00ff41 !important;
 }
 
-body[data-theme='faulty-terminal'] .class-card {
+body[data-theme='terminal'] .class-card {
   --subject-color: #00ff41 !important;
   background: rgba(0, 59, 0, 0.5) !important;
   border-color: rgba(0, 255, 65, 0.3) !important;
 }
 
-body[data-theme='faulty-terminal'] .class-card.glare-hover {
+body[data-theme='terminal'] .class-card.glare-hover {
   --gh-bg: rgba(0, 59, 0, 0.8) !important;
   --gh-border: rgba(0, 255, 65, 0.3) !important;
 }
 
-body[data-theme='faulty-terminal'] .planner-slot-cell .half-slot-card-wrapper.active .class-card {
+body[data-theme='terminal'] .planner-slot-cell .half-slot-card-wrapper.active .class-card {
   border-color: #00ff41 !important;
   box-shadow: inset 0 0 0 2px rgba(0, 255, 65, 0.4);
 }
 
 /* Retro Sharp & Pixelated/Dashed Borders */
-body[data-theme='faulty-terminal'] .class-card,
-body[data-theme='faulty-terminal'] .glass-card,
-body[data-theme='faulty-terminal'] .planner-dropdown,
-body[data-theme='faulty-terminal'] .dock-panel,
-body[data-theme='faulty-terminal'] .dock-item,
-body[data-theme='faulty-terminal'] .btn,
-body[data-theme='faulty-terminal'] .class-badge,
-body[data-theme='faulty-terminal'] .count-badge,
-body[data-theme='faulty-terminal'] .planner-search-input,
-body[data-theme='faulty-terminal'] .planner-search-label,
-body[data-theme='faulty-terminal'] .dropdown-clear-btn,
-body[data-theme='faulty-terminal'] .half-slot-delete-btn,
-body[data-theme='faulty-terminal'] .half-slot-plus,
-body[data-theme='faulty-terminal'] .planner-settings-btn,
-body[data-theme='faulty-terminal'] .planner-modify-panel,
-body[data-theme='faulty-terminal'] .modify-wt-btn,
-body[data-theme='faulty-terminal'] .modify-remove-btn,
-body[data-theme='faulty-terminal'] .modify-reset-btn,
-body[data-theme='faulty-terminal'] .empty-slot-plus {
+body[data-theme='terminal'] .class-card,
+body[data-theme='terminal'] .glass-card,
+body[data-theme='terminal'] .planner-dropdown,
+body[data-theme='terminal'] .dock-panel,
+body[data-theme='terminal'] .dock-item,
+body[data-theme='terminal'] .btn,
+body[data-theme='terminal'] .class-badge,
+body[data-theme='terminal'] .count-badge,
+body[data-theme='terminal'] .planner-search-input,
+body[data-theme='terminal'] .planner-search-label,
+body[data-theme='terminal'] .dropdown-clear-btn,
+body[data-theme='terminal'] .half-slot-delete-btn,
+body[data-theme='terminal'] .half-slot-plus,
+body[data-theme='terminal'] .planner-settings-btn,
+body[data-theme='terminal'] .planner-modify-panel,
+body[data-theme='terminal'] .modify-wt-btn,
+body[data-theme='terminal'] .modify-remove-btn,
+body[data-theme='terminal'] .modify-reset-btn,
+body[data-theme='terminal'] .empty-slot-plus {
   border-radius: 0 !important;
 }
 
-body[data-theme='faulty-terminal'] .class-card,
-body[data-theme='faulty-terminal'] .glass-card,
-body[data-theme='faulty-terminal'] .planner-dropdown,
-body[data-theme='faulty-terminal'] .dock-panel,
-body[data-theme='faulty-terminal'] .dock-item,
-body[data-theme='faulty-terminal'] .btn,
-body[data-theme='faulty-terminal'] .class-badge,
-body[data-theme='faulty-terminal'] .count-badge,
-body[data-theme='faulty-terminal'] .planner-search-input,
-body[data-theme='faulty-terminal'] .planner-search-label,
-body[data-theme='faulty-terminal'] .dropdown-clear-btn,
-body[data-theme='faulty-terminal'] .half-slot-delete-btn,
-body[data-theme='faulty-terminal'] .half-slot-plus,
-body[data-theme='faulty-terminal'] .planner-settings-btn,
-body[data-theme='faulty-terminal'] .planner-modify-panel,
-body[data-theme='faulty-terminal'] .planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
+body[data-theme='terminal'] .class-card,
+body[data-theme='terminal'] .glass-card,
+body[data-theme='terminal'] .planner-dropdown,
+body[data-theme='terminal'] .dock-panel,
+body[data-theme='terminal'] .dock-item,
+body[data-theme='terminal'] .btn,
+body[data-theme='terminal'] .class-badge,
+body[data-theme='terminal'] .count-badge,
+body[data-theme='terminal'] .planner-search-input,
+body[data-theme='terminal'] .planner-search-label,
+body[data-theme='terminal'] .dropdown-clear-btn,
+body[data-theme='terminal'] .half-slot-delete-btn,
+body[data-theme='terminal'] .half-slot-plus,
+body[data-theme='terminal'] .planner-settings-btn,
+body[data-theme='terminal'] .planner-modify-panel,
+body[data-theme='terminal'] .planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
   border-style: dashed !important;
   border-width: 2px !important;
 }
@@ -1340,24 +1586,24 @@ body[data-theme='faulty-terminal'] .planner-slot-cell.clickable:not(.has-selecti
 }
 
 /* Sapientia theme */
-body[data-theme='sapientia'] .planner-settings-btn {
+body[data-theme='light'] .planner-settings-btn {
   background: #e2e8f0;
   color: var(--text-primary);
   border-color: var(--border);
 }
 
-body[data-theme='sapientia'] .planner-settings-btn:hover {
+body[data-theme='light'] .planner-settings-btn:hover {
   background: #cbd5e1;
 }
 
 /* Faulty Terminal theme */
-body[data-theme='faulty-terminal'] .planner-settings-btn {
+body[data-theme='terminal'] .planner-settings-btn {
   background: rgba(0, 40, 0, 0.6);
   color: #00ff41;
   border: 2px dashed rgba(0, 255, 65, 0.4);
 }
 
-body[data-theme='faulty-terminal'] .planner-settings-btn:hover {
+body[data-theme='terminal'] .planner-settings-btn:hover {
   background: rgba(0, 60, 0, 0.8);
   border-color: rgba(0, 255, 65, 0.7);
 }
@@ -1491,67 +1737,67 @@ body[data-theme='faulty-terminal'] .planner-settings-btn:hover {
 }
 
 /* Sapientia overrides */
-body[data-theme='sapientia'] .planner-modify-panel {
+body[data-theme='light'] .planner-modify-panel {
   background: #ffffff;
   border-color: var(--border);
 }
 
-body[data-theme='sapientia'] .modify-panel-header {
+body[data-theme='light'] .modify-panel-header {
   background: #f8fafc;
 }
 
-body[data-theme='sapientia'] .modify-wt-btn {
+body[data-theme='light'] .modify-wt-btn {
   background: #f1f5f9;
   color: var(--text-secondary);
   border-color: var(--border);
 }
 
-body[data-theme='sapientia'] .modify-wt-btn:hover {
+body[data-theme='light'] .modify-wt-btn:hover {
   background: #e2e8f0;
   color: var(--text-primary);
 }
 
-body[data-theme='sapientia'] .modify-wt-btn.active {
+body[data-theme='light'] .modify-wt-btn.active {
   background: var(--sap-green);
   color: white;
   border-color: var(--sap-green);
 }
 
 /* Faulty Terminal overrides */
-body[data-theme='faulty-terminal'] .planner-modify-panel {
+body[data-theme='terminal'] .planner-modify-panel {
   background: rgba(0, 20, 0, 0.9);
   border-color: rgba(0, 255, 65, 0.3);
 }
 
-body[data-theme='faulty-terminal'] .modify-panel-header {
+body[data-theme='terminal'] .modify-panel-header {
   background: rgba(0, 40, 0, 0.5);
   border-color: rgba(0, 255, 65, 0.2);
 }
 
-body[data-theme='faulty-terminal'] .modify-wt-btn {
+body[data-theme='terminal'] .modify-wt-btn {
   background: rgba(0, 40, 0, 0.5);
   color: #008f11;
   border-color: rgba(0, 255, 65, 0.2);
 }
 
-body[data-theme='faulty-terminal'] .modify-wt-btn:hover {
+body[data-theme='terminal'] .modify-wt-btn:hover {
   background: rgba(0, 60, 0, 0.7);
   color: #00ff41;
 }
 
-body[data-theme='faulty-terminal'] .modify-wt-btn.active {
+body[data-theme='terminal'] .modify-wt-btn.active {
   background: rgba(0, 255, 65, 0.2);
   color: #00ff41;
   border-color: #00ff41;
 }
 
-body[data-theme='faulty-terminal'] .modify-remove-btn {
+body[data-theme='terminal'] .modify-remove-btn {
   background: rgba(255, 0, 0, 0.15);
   color: #ff0000;
   border-color: rgba(255, 0, 0, 0.3);
 }
 
-body[data-theme='faulty-terminal'] .modify-reset-btn {
+body[data-theme='terminal'] .modify-reset-btn {
   background: rgba(0, 40, 0, 0.5);
   color: #008f11;
   border-color: rgba(0, 255, 65, 0.2);

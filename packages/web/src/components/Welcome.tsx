@@ -3,19 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass } from '@shared/index';
-import type { ClassData, BackgroundTheme } from '@shared/lib/types';
+import type { ClassData } from '@shared/lib/types';
 import BackgroundSelector from './backgrounds/BackgroundSelector';
-
-const LAST_DARK_THEME_KEY = 'uni-last-dark-theme';
-const DARK_THEMES: BackgroundTheme[] = ['none', 'aurora', 'pixel-blast', 'silk', 'beams', 'dither', 'iridescence', 'liquid-chrome', 'faulty-terminal'];
-
-function withViewTransition(update: () => void) {
-    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
-        (document as any).startViewTransition(update);
-    } else {
-        update();
-    }
-}
+import { toggleLightDark, isLightTheme } from '../utils/theme';
 
 const SunIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -106,21 +96,11 @@ export default function Welcome() {
         e.target.value = '';
     };
 
-    const toggleTheme = () => {
-        const isLight = preferences.backgroundTheme === 'sapientia';
-        if (isLight) {
-            const stored = localStorage.getItem(LAST_DARK_THEME_KEY) as BackgroundTheme | null;
-            const target = (stored && DARK_THEMES.includes(stored)) ? stored : 'none';
-            withViewTransition(() => updatePreferences({ backgroundTheme: target }));
-        } else {
-            localStorage.setItem(LAST_DARK_THEME_KEY, preferences.backgroundTheme);
-            withViewTransition(() => updatePreferences({ backgroundTheme: 'sapientia' }));
-        }
-    };
+    const toggleTheme = () => toggleLightDark(preferences.colorTheme, updatePreferences);
 
     return (
         <div className="welcome-container" style={{ position: 'relative' }}>
-            <BackgroundSelector theme={preferences.backgroundTheme} />
+            <BackgroundSelector />
 
             <button
                 onClick={toggleTheme}
@@ -144,7 +124,8 @@ export default function Welcome() {
                     transition: 'all 0.2s ease'
                 }}
             >
-                {preferences.backgroundTheme === 'sapientia' ? <SunIcon /> : <MoonIcon />}
+                {/* Same semantics as the dock & login: the icon shows the mode you'll switch TO */}
+                {isLightTheme(preferences.colorTheme) ? <MoonIcon /> : <SunIcon />}
             </button>
 
             <div className="glass-card welcome-card">
@@ -235,7 +216,7 @@ export default function Welcome() {
                                     alignItems: 'center',
                                     margin: '20px 0',
                                     width: '100%',
-                                    opacity: preferences.backgroundTheme === 'sapientia' ? 1 : 0.6
+                                    opacity: isLightTheme(preferences.colorTheme) ? 1 : 0.6
                                 }}>
                                     <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
                                     <span style={{ padding: '0 10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>VAGY</span>
@@ -248,7 +229,7 @@ export default function Welcome() {
                                     style={{
                                         width: '100%',
                                         padding: '12px',
-                                        borderRadius: '10px',
+                                        borderRadius: 'var(--radius-md)',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',

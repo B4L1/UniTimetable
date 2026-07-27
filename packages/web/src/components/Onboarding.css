@@ -86,21 +86,21 @@
 }
 
 /* Theme integration */
-body[data-theme='sapientia'] .onboarding-card {
+body[data-theme='light'] .onboarding-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
 }
 
-body[data-theme='sapientia'] .onboarding-card h1 {
+body[data-theme='light'] .onboarding-card h1 {
     color: var(--sap-green);
 }
 
-body[data-theme='sapientia'] .save-btn {
+body[data-theme='light'] .save-btn {
     background: var(--sap-green);
 }
 
-body[data-theme='sapientia'] .save-btn:hover:not(:disabled) {
+body[data-theme='light'] .save-btn:hover:not(:disabled) {
     background: var(--accent-hover);
 }

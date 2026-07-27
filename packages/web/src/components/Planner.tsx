@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback, type RefObject } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
+import { webStorage } from '../stores/webStorage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { fetchAvailableClassesForPlanner, fetchTimetableEntries } from '@shared/index';
+import { fetchAvailableClassesForPlanner, fetchTimetableEntries, assignSubjectColors } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
 import GlareHover from './GlareHover';
 import AnimatedList from './AnimatedList';
@@ -21,20 +22,6 @@ const TIME_SLOTS = [
 ];
 
 const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
-
-// Map time to slot index
-function getSlotIndex(startTime: string): number {
-    if (!startTime) return -1;
-    // Handle "08:00:00" or "08:00" formats
-    const hour = parseInt(startTime.split(':')[0], 10);
-    if (hour >= 8 && hour < 10) return 0;
-    if (hour >= 10 && hour < 12) return 1;
-    if (hour >= 12 && hour < 14) return 2;
-    if (hour >= 14 && hour < 16) return 3;
-    if (hour >= 16 && hour < 18) return 4;
-    if (hour >= 18) return 5;
-    return -1;
-}
 
 // Helper to get minutes from "HH:MM"
 function getMinutes(timeStr: string): number {
@@ -65,7 +52,7 @@ interface PlannerProps {
 }
 
 export default function Planner({ onSaveRef, onCountChange, onSavingChange, classTypeSearch = '', onClassTypeSearchChange, includeCrossMajor, onIncludeCrossMajorChange }: PlannerProps) {
-    const { selectedClass, userSelections, addSelection, removeSelection, setSelections, clearSelections, importedSubjects, removedSubjects, customEntries, addRemovedSubject, setCustomEntry, removeCustomEntry } = useAppStore();
+    const { selectedClass, userSelections, setSelections, importedSubjects, removedSubjects, customEntries, setCustomEntry, removeCustomEntry } = useAppStore();
 
     const [availableClasses, setAvailableClasses] = useState<Map<string, AvailableClassEntry[]>>(new Map());
     const [selectedSlots, setSelectedSlots] = useState<Map<string, AvailableClassEntry[]>>(new Map());
@@ -76,6 +63,14 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [dropdownPos, setDropdownPos] = useState<{ left: number; top?: number; bottom?: number; width: number; maxHeight?: number } | null>(null);
     const [modifyingEntry, setModifyingEntry] = useState<AvailableClassEntry | null>(null);
+
+    // Undo state: stores the previous slot contents so a deletion can be reversed
+    const [undoState, setUndoState] = useState<{
+        key: string;
+        previousEntries: AvailableClassEntry[];
+        label: string;
+    } | null>(null);
+    const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Mobile Carousel State
     const today = new Date().getDay() - 1; // 0 = Monday
@@ -124,13 +119,8 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         try {
             const entryIds = Array.from(selectedSlots.values()).flat().map(item => item.id);
 
-            // Clear old selections first
-            await clearSelections();
-
-            // Add new selections
-            for (const id of entryIds) {
-                await addSelection(id);
-            }
+            // Single batch write (local + remote) instead of clear + N sequential adds
+            await setSelections(entryIds);
 
             setSaveMessage({ type: 'success', text: `${entryIds.length} óra mentve!` });
             setTimeout(() => setSaveMessage(null), 3000);
@@ -140,7 +130,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         } finally {
             setSaving(false);
         }
-    }, [selectedSlots, clearSelections, addSelection]);
+    }, [selectedSlots, setSelections]);
 
     // Refs for cells and wrapper
     const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -236,6 +226,30 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         try {
             // Pass importedSubjects to API
             const entries = await fetchAvailableClassesForPlanner(selectedClass.id, importedSubjects, includeCrossMajor);
+
+            // Offline fallback: fetch returned empty but we have saved selections.
+            // Rebuild a minimal available-classes map from the cached selected entries so
+            // the existing sync effect can still populate the planner grid.
+            if (entries.length === 0 && userSelections.length > 0) {
+                const cached = await webStorage.getSelectedEntriesCache();
+                if (cached && cached.length > 0) {
+                    assignSubjectColors(cached.map((e: AvailableClassEntry) => e.subject_name));
+                    const offlineGrouped = new Map<string, AvailableClassEntry[]>();
+                    cached.forEach((entry: AvailableClassEntry) => {
+                        TIME_SLOTS.forEach((_, slotIndex) => {
+                            if (!isEntryInSlot(entry.start_time, entry.end_time, slotIndex)) return;
+                            const key = `${entry.day_of_week}-${slotIndex}`;
+                            if (!offlineGrouped.has(key)) offlineGrouped.set(key, []);
+                            offlineGrouped.get(key)!.push(entry);
+                        });
+                    });
+                    setAvailableClasses(offlineGrouped);
+                    return;
+                }
+            }
+
+            // Deterministic subject colors from the full (sorted) subject set
+            assignSubjectColors(entries.map(e => e.subject_name));
 
             const grouped = new Map<string, AvailableClassEntry[]>();
 
@@ -384,6 +398,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const deleteEntry = (dayIndex: number, slotIndex: number, entryId: string) => {
         const key = `${dayIndex}-${slotIndex}`;
         const currentSelections = selectedSlots.get(key) || [];
+        const deleted = currentSelections.find(e => e.id === entryId);
         const newSelections = currentSelections.filter(e => e.id !== entryId);
 
         // Update local state only (manual save model)
@@ -394,6 +409,18 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             newSelectionsMap.delete(key);
         }
         setSelectedSlots(newSelectionsMap);
+
+        // Store undo snapshot (previous full slot state before deletion)
+        if (deleted) {
+            if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+            setUndoState({
+                key,
+                previousEntries: currentSelections,
+                label: deleted.subject_name || 'Óra',
+            });
+            undoTimerRef.current = setTimeout(() => setUndoState(null), 5000);
+        }
+
         // Close any open dropdown
         setActiveSlot(null);
         setActiveHalf(null);
@@ -401,26 +428,26 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         setModifyingEntry(null);
     };
 
-    const loadDefaults = async () => {
-        if (!selectedClass?.id) {
-            console.log('No selected class ID');
-            return;
-        }
+    const handleUndo = () => {
+        if (!undoState) return;
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        const newSelectionsMap = new Map(selectedSlots);
+        newSelectionsMap.set(undoState.key, undoState.previousEntries);
+        setSelectedSlots(newSelectionsMap);
+        setUndoState(null);
+    };
 
-        console.log('Loading defaults for class:', selectedClass.id);
+    const loadDefaults = async () => {
+        if (!selectedClass?.id) return;
 
         if (availableClasses.size === 0) {
-            console.log('Available classes empty, fetching...');
             await loadAvailableClasses();
         }
 
         setLoading(true);
         try {
             let defaults = await fetchTimetableEntries(selectedClass.id);
-            console.log('Fetched defaults:', defaults);
-
             const available = await fetchAvailableClassesForPlanner(selectedClass.id);
-            console.log('Fetched available:', available);
 
             // Re-build map for this scope WITH DEDUPLICATION
             const availableMap = new Map<string, AvailableClassEntry[]>();
@@ -452,20 +479,12 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
             setAvailableClasses(availableMap);
 
-            console.log('Selected Class ID:', selectedClass.id);
-            console.log('Selected Class Name:', selectedClass.name);
-            const uniqueAvailableNames = Array.from(new Set(available.map(a => a.class_name).filter(Boolean)));
-            console.log('Available Class Names found:', uniqueAvailableNames);
-
             // Fallback: If defaults are empty/stale, try to find current class entries in available list
             if ((!defaults || defaults.length === 0) && available.length > 0) {
-                console.log('Defaults empty. Attempting smart fallbacks...');
-
                 // 1. Try ID match
                 const idMatch = available.filter(a => a.class_id === selectedClass.id);
                 if (idMatch.length > 0) {
                     defaults = idMatch;
-                    console.log('Fallback 1: ID match count:', defaults.length);
                 }
 
                 // 2. Direct Name Match
@@ -473,14 +492,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     const exactMatch = available.filter(a => a.class_name === selectedClass.name);
                     if (exactMatch.length > 0) {
                         defaults = exactMatch;
-                        console.log('Fallback 2: Exact Name match count:', defaults.length);
                     }
                 }
 
                 // 3. Smart Name Match (Weighted Token Overlap)
                 if (defaults.length === 0 && selectedClass.name) {
-                    console.log('Fallback 3: Attempting Smart Name Match...');
-
                     // Get all unique class names from available list
                     const candidateNames = Array.from(new Set(available.map(a => a.class_name).filter(Boolean))) as string[];
 
@@ -510,27 +526,14 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                             }
                         });
 
-                        console.log(`Smart Match Result: Best Name="${bestName}" with Score=${bestScore}`);
-
                         if (bestName && bestScore > 0) {
                             defaults = available.filter(a => a.class_name === bestName);
-                            console.log(`Fallback 2: Smart match found ${defaults.length} entries for ${bestName}`);
-                        } else {
-                            console.error(`Fallback failed. Target ID: ${selectedClass.id}, Target Name: ${selectedClass.name}. Available names:`, candidateNames);
                         }
                     }
                 }
             }
 
-            if (defaults.length === 0) {
-                console.error("DEFAULTS IS STILL EMPTY. IT WILL NOT LOAD ANYTHING.");
-            }
-
             const newSelectedSlots = new Map<string, AvailableClassEntry[]>();
-
-            if (defaults.length > 0) {
-                console.log('Sample defaults entry keys:', Object.keys(defaults[0]));
-            }
 
             defaults.forEach(entry => {
                 const time = (entry as any).startTime || entry.start_time;
@@ -538,8 +541,6 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                 const dayIndex = (entry as any).dayOfWeek ?? entry.day_of_week;
                 const weekType = (entry as any).weekType ?? entry.week_type;
                 const subjectName = (entry as any).subjectName || entry.subject_name;
-
-                console.log(`Processing: ${subjectName}, Time: ${time}, Day: ${dayIndex}`);
 
                 if (dayIndex === undefined) return;
 
@@ -562,7 +563,6 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
                     // 3. Synthetic fallback
                     if (!fullEntry) {
-                        console.log(`Creating synthetic entry for ${subjectName}`);
                         fullEntry = {
                             ...entry,
                             class_name: selectedClass.name,
@@ -576,13 +576,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         // This prevents "Lecture" appearing 3 times in the same cell.
                         if (!existing.some(e => e.subject_name === fullEntry!.subject_name)) {
                             newSelectedSlots.set(key, [...existing, fullEntry]);
-                            console.log(`Added to slot ${key}`);
                         }
                     }
                 });
             });
 
-            console.log('Final Selected Slots Map Size:', newSelectedSlots.size);
             setSelectedSlots(newSelectedSlots);
 
             if (newSelectedSlots.size > 0) {
@@ -930,30 +928,92 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
     return (
         <div className="planner-container">
-            {saveMessage && (
-                <div
-                    className={`save-message-floating glass-card ${saveMessage.type}`}
-                    style={{
-                        position: 'fixed',
-                        bottom: '80px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        zIndex: 1000,
-                        padding: '12px 24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                        border: '1px solid var(--border)',
-                        color: saveMessage.type === 'success' ? 'var(--success)' : 'var(--error)',
-                        background: 'var(--bg-secondary)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '12px'
-                    }}
-                >
-                    {saveMessage.type === 'success' ? '✅' : '❌'} {saveMessage.text}
-                </div>
-            )}
+            {/* Save / error toast */}
+            <AnimatePresence>
+                {saveMessage && (
+                    <motion.div
+                        key="save-toast"
+                        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                        className={`save-message-floating glass-card ${saveMessage.type}`}
+                        style={{
+                            position: 'fixed',
+                            bottom: '80px',
+                            left: '50%',
+                            translateX: '-50%',
+                            zIndex: 1000,
+                            padding: '12px 24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                            border: '1px solid var(--border)',
+                            color: saveMessage.type === 'success' ? 'var(--success)' : 'var(--error)',
+                            background: 'var(--bg-secondary)',
+                            backdropFilter: 'blur(12px)',
+                            borderRadius: 'var(--radius-lg)',
+                        }}
+                    >
+                        {saveMessage.type === 'success' ? '✅' : '❌'} {saveMessage.text}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Undo toast — appears after a card is deleted */}
+            <AnimatePresence>
+                {undoState && (
+                    <motion.div
+                        key="undo-toast"
+                        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                        style={{
+                            position: 'fixed',
+                            bottom: saveMessage ? '140px' : '80px',
+                            left: '50%',
+                            translateX: '-50%',
+                            zIndex: 1001,
+                            padding: '10px 12px 10px 18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '14px',
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-card)',
+                            backdropFilter: 'blur(12px)',
+                            borderRadius: 'var(--radius-lg)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.875rem',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                            Törölve: <strong style={{ color: 'var(--text-primary)' }}>{undoState.label}</strong>
+                        </span>
+                        <button
+                            onClick={handleUndo}
+                            style={{
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '5px 14px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'background 0.15s ease',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
+                        >
+                            Visszavonás
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {selectedSlots.size === 0 && availableClasses.size > 0 && (
                 <div className="planner-empty-state">
@@ -1106,7 +1166,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                     style={{
                                                         flex: 1,
                                                         padding: '5px 10px',
-                                                        borderRadius: '8px',
+                                                        borderRadius: 'var(--radius-sm)',
                                                         border: '1px solid var(--border)',
                                                         background: 'var(--bg-secondary)',
                                                         color: 'var(--text-primary)',
@@ -1314,7 +1374,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                 glareOpacity={0.2}
                                                 glareSize={150}
                                                 height="auto"
-                                                borderRadius="8px"
+                                                borderRadius="var(--radius-sm)"
                                                 borderColor="var(--border)"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1326,7 +1386,14 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                         )
                                     ] : []),
                                     ...dropdownOptions.map((item) => {
-                                        if ('isDivider' in item) return null;
+                                        if ('isDivider' in item) {
+                                            // Visual separator between compatible and full-week ("replace") classes
+                                            return (
+                                                <div key={item.id} className="dropdown-divider">
+                                                    <span>Minden hetes órák</span>
+                                                </div>
+                                            );
+                                        }
                                         const entry = item as AvailableClassEntry;
                                         return (
                                             <div key={entry.id} style={{ position: 'relative' }}>
@@ -1366,7 +1433,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             key="clear-btn"
                                             background="rgba(239, 68, 68, 0.15)"
                                             borderColor="rgba(239, 68, 68, 0.4)"
-                                            borderRadius="8px"
+                                            borderRadius="var(--radius-sm)"
                                             glareColor="#ffffff"
                                             glareOpacity={0.2}
                                             glareAngle={-30}
@@ -1388,14 +1455,17 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                     ] : [])
                                 ]}
                                 onItemSelect={(index) => {
-                                    // Offset by settings button if present
+                                    // Item layout: [settings?] [options...] [clear?] [empty-msg?]
                                     const hasSettingsBtn = hasSelectedInActiveSlot ? 1 : 0;
+                                    const clearBtnIndex = hasSettingsBtn + dropdownOptions.length;
                                     const adjustedIndex = index - hasSettingsBtn;
                                     if (adjustedIndex >= 0 && adjustedIndex < dropdownOptions.length) {
                                         const item = dropdownOptions[adjustedIndex];
                                         if ('isDivider' in item) return;
                                         selectClass(item as AvailableClassEntry);
-                                    } else if (adjustedIndex >= dropdownOptions.length) {
+                                    } else if (index === clearBtnIndex && hasSelectedInActiveSlot) {
+                                        // Only the explicit delete button clears the slot —
+                                        // the "Nincs más opció" info row must not delete anything
                                         selectClass(null);
                                     }
                                 }}

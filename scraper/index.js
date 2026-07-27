@@ -49,6 +49,17 @@ const SUBJECT_COLORS = [
     '#84cc16', '#06b6d4', '#f43f5e', '#eab308', '#22c55e',
 ];
 
+const teacherLookupCache = new Map();
+
+function slugifyClassPart(value) {
+    return (value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 /**
  * Click the "Osztályok" button
  */
@@ -89,6 +100,14 @@ async function clickTeachersButton(page) {
     return clicked;
 }
 
+async function waitForTimetableReady(page) {
+    await page.waitForFunction(() => {
+        const svg = document.querySelector('div.print-nobreak svg');
+        return Boolean(svg && svg.querySelector('rect'));
+    }, { timeout: 10000 });
+    await new Promise(r => setTimeout(r, 500));
+}
+
 /**
  * Dismiss cookies
  */
@@ -114,31 +133,163 @@ async function extractClasses(page) {
     console.log('   ✓ Clicked Osztályok');
     await new Promise(r => setTimeout(r, 1000));
 
-    const classes = await page.evaluate(() => {
+    const classes = await page.evaluate(async () => {
         const result = [];
-        const allLinks = document.querySelectorAll('a');
+        const seen = new Set();
 
-        allLinks.forEach((el, index) => {
-            const name = el.textContent?.trim() || '';
-            if (/[A-Za-zÁÉÍÓÚÖÜŐŰáéíóúöüőű]+\s+[IVX]+\.\s*[A-Z]/.test(name)) {
-                const match = name.match(/^(.+?)\s*([IVX]+)\.\s*([A-Z])(?:\.\s*-?\d+)?/);
-                let faculty = '', year = 0, groupCode = '';
+        const romanToNumber = (roman) => {
+            const map = {
+                I: 1, II: 2, III: 3, IV: 4, V: 5,
+                VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
+            };
+            return map[roman] || 0;
+        };
 
-                if (match) {
-                    faculty = match[1].trim();
-                    const romanYear = match[2];
-                    year = romanYear === 'I' ? 1 : romanYear === 'II' ? 2 : romanYear === 'III' ? 3 : 0;
-                    groupCode = match[3];
-                }
+        const normalize = (raw) => {
+            return (raw || '')
+                .replace(/\u00a0/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
 
-                result.push({ name, faculty, year, groupCode, edupageId: `class-${index}` });
+        const stripHeadcount = (value) => {
+            return value.replace(/[-–—]\s*\d+\s*$/u, '').trim();
+        };
+
+        const parseClassName = (rawName) => {
+            const cleanedName = stripHeadcount(normalize(rawName));
+            if (!cleanedName) return null;
+
+            const tokens = cleanedName
+                .replace(/[.,]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .split(' ')
+                .filter(Boolean);
+
+            if (tokens.length === 0) return null;
+
+            let yearIndex = tokens.findIndex(t => romanToNumber(t) > 0);
+            let year = yearIndex >= 0 ? romanToNumber(tokens[yearIndex]) : 0;
+
+            if (yearIndex === -1) {
+                yearIndex = tokens.findIndex(t => /^\d{1,2}$/.test(t));
+                year = yearIndex >= 0 ? parseInt(tokens[yearIndex], 10) : 0;
             }
-        });
+
+            if (yearIndex === -1 || !year) return null;
+
+            let language = '';
+            let facultyTokens = tokens.slice(0, yearIndex);
+            const beforeYear = facultyTokens[facultyTokens.length - 1]?.toUpperCase();
+            if (beforeYear === 'EN' || beforeYear === 'DE') {
+                language = beforeYear;
+                facultyTokens = facultyTokens.slice(0, -1);
+            }
+
+            let remainder = tokens.slice(yearIndex + 1);
+            if (!language && remainder.length > 0) {
+                const maybeLang = remainder[0].toUpperCase();
+                if (maybeLang === 'EN' || maybeLang === 'DE') {
+                    language = maybeLang;
+                    remainder = remainder.slice(1);
+                }
+            }
+
+            let groupCode = '';
+            if (remainder.length > 0) {
+                const candidate = remainder[0].toUpperCase();
+                if (/^[A-Z]{1,3}$/.test(candidate) && candidate !== 'EN' && candidate !== 'DE') {
+                    groupCode = candidate;
+                }
+            }
+
+            const faculty = facultyTokens.join(' ').trim();
+            if (!faculty) return null;
+
+            return {
+                name: cleanedName,
+                faculty,
+                year,
+                groupCode,
+                language,
+            };
+        };
+
+        const isVisible = (el) => {
+            const style = window.getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+        };
+
+        const addClassCandidate = (rawName) => {
+            const parsed = parseClassName(rawName);
+            if (!parsed) return;
+            const key = parsed.name;
+            if (!seen.has(key)) {
+                result.push(parsed);
+                seen.add(key);
+            }
+        };
+
+        const collectFromRoot = (root) => {
+            const elements = root.querySelectorAll('a, li, span, div');
+            elements.forEach(el => {
+                if (!isVisible(el)) return;
+                addClassCandidate(el.textContent || el.getAttribute('title') || el.getAttribute('aria-label') || '');
+            });
+        };
+
+        const menuRoots = Array.from(document.querySelectorAll(
+            '.asc-context-menu, [class*="context-menu"], [class*="ContextMenu"], [role="menu"]'
+        )).filter(isVisible);
+
+        for (const [rootIndex, root] of menuRoots.entries()) {
+            const scrollable = root.scrollHeight > root.clientHeight + 4;
+            if (!scrollable) {
+                collectFromRoot(root);
+                continue;
+            }
+
+            const step = Math.max(120, Math.floor(root.clientHeight * 0.8));
+            const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+            const positions = [0];
+            for (let pos = step; pos < maxScroll; pos += step) {
+                positions.push(pos);
+            }
+            positions.push(maxScroll);
+
+            for (const position of positions) {
+                root.scrollTop = position;
+                await new Promise(r => setTimeout(r, 150));
+                collectFromRoot(root);
+            }
+        }
+
+        if (result.length === 0) {
+            // Fallback: look for all visible links on the page
+            const allLinks = document.querySelectorAll('a, li, span');
+            allLinks.forEach(el => {
+                if (!isVisible(el)) return;
+                addClassCandidate(normalize(el.textContent));
+            });
+        }
+
         return result;
     });
 
-    console.log(`   Found ${classes.length} classes`);
-    return classes;
+    const classesWithStableIds = classes.map(classInfo => ({
+        ...classInfo,
+        edupageId: `class-${slugifyClassPart(classInfo.faculty)}-${classInfo.year}-${slugifyClassPart(classInfo.groupCode || 'all')}`,
+    }));
+
+    console.log(`   Found ${classesWithStableIds.length} classes`);
+    classesWithStableIds.forEach((classInfo, index) => {
+        console.log(
+            `   [${index + 1}/${classesWithStableIds.length}] ${classInfo.name} | year=${classInfo.year} | faculty=${classInfo.faculty} | group=${classInfo.groupCode || '-'} | edupageId=${classInfo.edupageId}`
+        );
+    });
+    return classesWithStableIds;
 }
 
 /**
@@ -148,6 +299,7 @@ function isValidTeacherName(name) {
     if (!name) return false;
     const trimmed = name.trim();
     if (trimmed.length < 3) return false;
+    if (trimmed.length > 80) return false;
     
     const lower = trimmed.toLowerCase();
     if (lower === 'rendben') return false;
@@ -159,12 +311,17 @@ function isValidTeacherName(name) {
     ];
     if (trashKeywords.some(kw => lower.includes(kw))) return false;
 
-    // Must contain at least a space (first and last name)
-    if (!trimmed.includes(' ')) return false;
     // Disallow digits
     if (/\d/.test(trimmed)) return false;
-    // Support unicode letters
+
+    // Support unicode letters plus the punctuation that often appears in names/titles
     if (/[^\p{L}\s\.-]/u.test(trimmed)) return false;
+
+    // Accept either a typical multi-part name or a titled name like "Dr. X"
+    const hasMultipleParts = trimmed.includes(' ') || /\b[A-ZÁÉÍÓÚÖÜŐŰ][a-záéíóúöüőű]+\s+[A-ZÁÉÍÓÚÖÜŐŰ]/u.test(trimmed);
+    const hasTitle = /^(dr\.|prof\.|doc\.)\s+/i.test(trimmed);
+    if (!hasMultipleParts && !hasTitle) return false;
+
     return true;
 }
 
@@ -195,32 +352,83 @@ async function extractTeachers(page) {
     });
     console.log(`   DEBUG: Found ${debugInfo.count} total elements, first few:`, debugInfo.first5.join(', '));
 
-    const teachers = await page.evaluate(() => {
+    const teachers = await page.evaluate(async () => {
         const result = [];
-        // Broad search for anything that looks like a name in a list
-        const elements = document.querySelectorAll('.asc-context-menu a, .asc-context-menu li, .body a, a');
-        
         const seen = new Set();
-        elements.forEach((el, index) => {
-            const name = el.textContent?.trim() || '';
-            // Heuristic to avoid titles and class patterns (Roman numerals followed by dot and letter)
-            const isClass = /[IVX]+\.\s*[A-Z]/.test(name);
-            const isMenu = name === 'Tanárok' || name === 'Osztályok' || name === 'Tantermek' || name === 'Tantárgyak';
+        const normalize = (value) => (value || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const isVisible = (el) => {
+            const style = window.getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+        };
+
+        const addCandidate = (rawName) => {
+            const name = normalize(rawName);
+            if (!name || name.length < 2) return;
             
-            if (name && name.length > 2 && !isClass && !isMenu) {
-                // Heuristic: Teachers in this list usually have "Name Initials" or "Dr. Name"
-                // But it's safer to just take everything that doesn't look like a class or menu
-                if (!seen.has(name)) {
-                    result.push({ name, edupageId: `teacher-${index}` });
-                    seen.add(name);
-                }
+            // Skip obvious menu labels
+            if (name === 'Tanárok' || name === 'Osztályok' || name === 'Tantermek' || name === 'Tantárgyak' || name === 'Rendben') {
+                return;
             }
-        });
+            
+            // Collect all non-empty names, validation happens later via isValidTeacherName
+            if (!seen.has(name)) {
+                result.push(name);
+                seen.add(name);
+            }
+        };
+
+        const collectFromRoot = (root) => {
+            const elements = root.querySelectorAll('a, li, span, div');
+            elements.forEach(el => {
+                if (!isVisible(el)) return;
+                addCandidate(el.textContent || el.getAttribute('title') || el.getAttribute('aria-label') || '');
+            });
+        };
+
+        const menuRoots = Array.from(document.querySelectorAll(
+            '.asc-context-menu, [class*="context-menu"], [class*="ContextMenu"], [role="menu"]'
+        )).filter(isVisible);
+
+        for (const root of menuRoots) {
+            const scrollable = root.scrollHeight > root.clientHeight + 4;
+            if (!scrollable) {
+                collectFromRoot(root);
+                continue;
+            }
+
+            const step = Math.max(120, Math.floor(root.clientHeight * 0.8));
+            const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+            const positions = [0];
+            for (let pos = step; pos < maxScroll; pos += step) {
+                positions.push(pos);
+            }
+            positions.push(maxScroll);
+
+            for (const position of positions) {
+                root.scrollTop = position;
+                await new Promise(r => setTimeout(r, 200));
+                collectFromRoot(root);
+            }
+        }
+
         return result;
     });
 
-    console.log(`   Found ${teachers.length} teachers`);
-    return teachers;
+    console.log(`   Found ${teachers.length} raw teacher names`);
+
+    // Filter through isValidTeacherName
+    const validTeachers = teachers.filter(name => isValidTeacherName(name)).map((name, index) => ({
+        name,
+        edupageId: `teacher-${index}`,
+    }));
+
+    console.log(`   Passed validation: ${validTeachers.length} teachers`);
+    return validTeachers;
 }
 
 /**
@@ -245,6 +453,145 @@ function getSlotFromX(x) {
     return slot >= 1 && slot <= 12 ? slot : -1;
 }
 
+function normalizeLookupValue(value) {
+    return (value || '')
+        .toLowerCase()
+        .replace(/\u00a0/g, ' ')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getPrimaryTeacherName(metaInfo) {
+    return (metaInfo || '')
+        .split(/[\n,;/]/)
+        .map(part => part.trim())
+        .find(Boolean) || '';
+}
+
+async function resolveTeacherByName(teacherName) {
+    const normalizedTarget = normalizeLookupValue(teacherName);
+    if (!normalizedTarget) return null;
+
+    if (!teacherLookupCache.has('teachers')) {
+        const { data, error } = await supabase
+            .from('teachers')
+            .select('id, name');
+
+        if (error) {
+            console.error('   Error loading teachers for verification:', error.message);
+            teacherLookupCache.set('teachers', []);
+        } else {
+            teacherLookupCache.set('teachers', data || []);
+        }
+    }
+
+    const teachers = teacherLookupCache.get('teachers') || [];
+    return teachers.find(teacher => normalizeLookupValue(teacher.name) === normalizedTarget) || null;
+}
+
+async function verifyWeekTypeWithTeacherTimetable(entry, guessedWeekType) {
+    const teacherName = getPrimaryTeacherName(entry.teacherName);
+    console.log(
+        `   ↳ Biweekly-looking cell: ${entry.subjectName} | ${entry.dayOfWeek} ${entry.startTime}-${entry.endTime} | teacher=${teacherName || 'unknown'} | guessed=${guessedWeekType}`
+    );
+
+    if (!teacherName) {
+        console.log('      No teacher name available, keeping heuristic week type');
+        return guessedWeekType;
+    }
+
+    const teacher = await resolveTeacherByName(teacherName);
+    if (!teacher?.id) {
+        console.log('      Teacher not found in database yet, keeping heuristic week type');
+        return guessedWeekType;
+    }
+
+    const { data, error } = await supabase
+        .from('timetable_entries')
+        .select('week_type, subject_name, day_of_week, start_time, end_time')
+        .eq('teacher_id', teacher.id)
+        .eq('day_of_week', entry.dayOfWeek)
+        .eq('start_time', entry.startTime)
+        .eq('end_time', entry.endTime);
+
+    if (error) {
+        console.error('      Error checking teacher timetable:', error.message);
+        return guessedWeekType;
+    }
+
+    if (!data || data.length === 0) {
+        console.log('      No matching teacher timetable entry found, keeping heuristic week type');
+        return guessedWeekType;
+    }
+
+    const weekTypes = [...new Set(data.map(row => row.week_type))];
+    if (weekTypes.includes('all')) {
+        console.log('      Teacher timetable shows all-week entry, overriding to weekType=all');
+        return 'all';
+    }
+
+    if (weekTypes.includes(guessedWeekType)) {
+        console.log(`      Teacher timetable matches guessed weekType=${guessedWeekType}`);
+        return guessedWeekType;
+    }
+
+    console.log(`      Teacher timetable returned ${weekTypes.join(', ')}; keeping heuristic week type=${guessedWeekType}`);
+    return guessedWeekType;
+}
+
+async function recheckBiweeklyClassEntries(savedClasses) {
+    if (!savedClasses || savedClasses.length === 0) return;
+
+    console.log('\n🔁 Rechecking biweekly-looking class entries after teachers were loaded...');
+
+    let updatedCount = 0;
+
+    for (const savedClass of savedClasses) {
+        const { data: entries, error } = await supabase
+            .from('timetable_entries')
+            .select('id, subject_name, teacher_name, day_of_week, start_time, end_time, week_type')
+            .eq('class_id', savedClass.id)
+            .in('week_type', ['odd', 'even']);
+
+        if (error) {
+            console.error(`   Error loading entries for ${savedClass.name}:`, error.message);
+            continue;
+        }
+
+        for (const entry of entries || []) {
+            const correctedWeekType = await verifyWeekTypeWithTeacherTimetable(
+                {
+                    subjectName: entry.subject_name,
+                    teacherName: entry.teacher_name,
+                    dayOfWeek: entry.day_of_week,
+                    startTime: entry.start_time,
+                    endTime: entry.end_time,
+                },
+                entry.week_type
+            );
+
+            if (correctedWeekType === entry.week_type) continue;
+
+            const { error: updateError } = await supabase
+                .from('timetable_entries')
+                .update({ week_type: correctedWeekType })
+                .eq('id', entry.id);
+
+            if (updateError) {
+                console.error(`   Error updating ${entry.subject_name} (${savedClass.name}):`, updateError.message);
+                continue;
+            }
+
+            updatedCount += 1;
+            console.log(`   ✓ Updated ${savedClass.name}: ${entry.subject_name} -> weekType=${correctedWeekType}`);
+        }
+    }
+
+    console.log(`   ✓ Biweekly recheck complete, updated ${updatedCount} entry(ies)`);
+}
+
 /**
  * Extract name from SVG header
  */
@@ -262,124 +609,179 @@ async function extractNameFromHeader(page) {
 async function extractTimetable(page, targetName, mode = 'class') {
     console.log(`📅 Extracting ${mode} timetable for: ${targetName}`);
 
-    // 1. Ensure menu is open (Tanárok or Osztályok)
-    if (mode === 'teacher') {
-        await clickTeachersButton(page);
-    } else {
-        await clickClassesButton(page);
-    }
-    await new Promise(r => setTimeout(r, 1000));
+    const runExtraction = async () => {
+        // 1. Ensure menu is open (Tanárok or Osztályok)
+        if (mode === 'teacher') {
+            await clickTeachersButton(page);
+        } else {
+            await clickClassesButton(page);
+        }
+        await new Promise(r => setTimeout(r, 1000));
 
-    // 2. Click on the item (class or teacher)
-    const clicked = await page.evaluate((name) => {
-        // Look in context menus first
-        const elements = document.querySelectorAll('.asc-context-menu a, .asc-context-menu span, .body a, a');
-        for (const el of elements) {
-            if (el.textContent?.trim() === name) {
-                el.click();
-                // Check if we need to click a parent or child? 
-                // Usually el.click() works if it's the actual interactive element
+        // 2. Click on the item (class or teacher)
+        const clicked = await page.evaluate((name) => {
+            const normalize = (value) => {
+                return (value || '')
+                    .toLowerCase()
+                    .replace(/\u00a0/g, ' ')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^\p{L}\s]/gu, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            };
+
+            const target = normalize(name);
+            if (!target) return false;
+
+            // Look in context menus first
+            const elements = document.querySelectorAll('.asc-context-menu a, .asc-context-menu span, .body a, a');
+
+            let fallback = null;
+            for (const el of elements) {
+                const raw = el.textContent || '';
+                const normalized = normalize(raw);
+                if (!normalized) continue;
+
+                if (normalized === target) {
+                    el.click();
+                    return true;
+                }
+
+                if (!fallback && (normalized.includes(target) || target.includes(normalized))) {
+                    fallback = el;
+                }
+            }
+
+            if (fallback) {
+                fallback.click();
                 return true;
             }
+
+            return false;
+        }, targetName);
+
+        if (!clicked) {
+            console.log(`   ✗ Could not click ${mode}: ${targetName}`);
+            return [];
         }
-        return false;
-    }, targetName);
 
-    if (!clicked) {
-        console.log(`   ✗ Could not click ${mode}: ${targetName}`);
-        return [];
-    }
+        await waitForTimetableReady(page);
 
-    // Wait for SVG to render
-    await new Promise(r => setTimeout(r, 2500));
+        // Extract from SVG
+        const entries = await page.evaluate((mode) => {
+            const result = [];
+            const rects = document.querySelectorAll('rect');
 
-    // Extract from SVG
-    const entries = await page.evaluate((mode) => {
-        const result = [];
-        const rects = document.querySelectorAll('rect');
+            rects.forEach(rect => {
+                const title = rect.querySelector('title');
+                if (!title) return;
 
-        rects.forEach(rect => {
-            const title = rect.querySelector('title');
-            if (!title) return;
+                const titleText = title.textContent?.trim() || '';
+                if (!titleText || titleText.length < 3) return;
 
-            const titleText = title.textContent?.trim() || '';
-            if (!titleText || titleText.length < 3) return;
+                const lines = titleText.split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length < 1) return;
 
-            const lines = titleText.split('\n').map(l => l.trim()).filter(Boolean);
-            if (lines.length < 1) return;
+                const subjectName = lines[0] || '';
+                let metaInfo = lines[1] || ''; // Teacher name in class view, Class names in teacher view
+                const classroom = lines[2] || '';
 
-            const subjectName = lines[0] || '';
-            let metaInfo = lines[1] || ''; // Teacher name in class view, Class names in teacher view
-            const classroom = lines[2] || '';
+                if (!subjectName || subjectName.length < 2) return;
 
-            if (!subjectName || subjectName.length < 2) return;
+                // Get position and dimensions
+                const x = parseFloat(rect.getAttribute('x') || '0');
+                const y = parseFloat(rect.getAttribute('y') || '0');
+                const height = parseFloat(rect.getAttribute('height') || '306');
+                const width = parseFloat(rect.getAttribute('width') || '213.75');
 
-            // Get position and dimensions
-            const x = parseFloat(rect.getAttribute('x') || '0');
-            const y = parseFloat(rect.getAttribute('y') || '0');
-            const height = parseFloat(rect.getAttribute('height') || '306');
-            const width = parseFloat(rect.getAttribute('width') || '213.75');
+                // Get color
+                const style = rect.getAttribute('style') || '';
+                const colorMatch = style.match(/fill:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                let color = '#6366f1';
+                if (colorMatch) {
+                    const r = parseInt(colorMatch[1]);
+                    const g = parseInt(colorMatch[2]);
+                    const b = parseInt(colorMatch[3]);
+                    color = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                }
 
-            // Get color
-            const style = rect.getAttribute('style') || '';
-            const colorMatch = style.match(/fill:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-            let color = '#6366f1';
-            if (colorMatch) {
-                const r = parseInt(colorMatch[1]);
-                const g = parseInt(colorMatch[2]);
-                const b = parseInt(colorMatch[3]);
-                color = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-            }
-
-            result.push({
-                subjectName,
-                metaInfo,
-                classroom,
-                x,
-                y,
-                width,
-                height,
-                color,
+                result.push({
+                    subjectName,
+                    metaInfo,
+                    classroom,
+                    x,
+                    y,
+                    width,
+                    height,
+                    color,
+                });
             });
-        });
 
-        return result;
-    }, mode);
+            return result;
+        }, mode);
 
-    // Calculate day and time slot
-    const processedEntries = entries.map(entry => {
-        const dayOfWeek = getDayFromY(entry.y);
-        const startSlot = getSlotFromX(entry.x);
-        const numSlots = Math.max(1, Math.round(entry.width / 213.75));
-        const endSlot = startSlot + numSlots - 1;
+        // Calculate day and time slot
+        const processedEntries = (await Promise.all(entries.map(async entry => {
+            const dayOfWeek = getDayFromY(entry.y);
+            const startSlot = getSlotFromX(entry.x);
+            const numSlots = Math.max(1, Math.round(entry.width / 213.75));
+            const endSlot = startSlot + numSlots - 1;
 
-        const startTimeSlot = TIME_SLOTS[startSlot] || { start: '08:00', end: '09:00' };
-        const endTimeSlot = TIME_SLOTS[endSlot] || TIME_SLOTS[12] || { start: '08:00', end: '09:00' };
+            const startTimeSlot = TIME_SLOTS[startSlot] || { start: '08:00', end: '09:00' };
+            const endTimeSlot = TIME_SLOTS[endSlot] || TIME_SLOTS[12] || { start: '08:00', end: '09:00' };
 
-        let weekType = 'all';
-        if (entry.height < 200) {
-            const dayRange = DAY_Y_RANGES.find(r => r.day === dayOfWeek);
-            if (dayRange) {
-                const midPoint = (dayRange.minY + dayRange.maxY) / 2;
-                weekType = entry.y < midPoint ? 'odd' : 'even';
+            let weekType = 'all';
+            let looksBiweekly = false;
+            if (entry.height < 200) {
+                const dayRange = DAY_Y_RANGES.find(r => r.day === dayOfWeek);
+                if (dayRange) {
+                    const midPoint = (dayRange.minY + dayRange.maxY) / 2;
+                    weekType = entry.y < midPoint ? 'odd' : 'even';
+                    looksBiweekly = true;
+                }
             }
+
+            if (mode === 'class' && looksBiweekly && weekType !== 'all') {
+                weekType = await verifyWeekTypeWithTeacherTimetable(
+                    {
+                        subjectName: entry.subjectName,
+                        teacherName: entry.metaInfo,
+                        dayOfWeek,
+                        startTime: startTimeSlot.start,
+                        endTime: endTimeSlot.end,
+                    },
+                    weekType
+                );
+            }
+
+            return {
+                subjectName: entry.subjectName,
+                teacherName: mode === 'class' ? entry.metaInfo : null,
+                classNames: mode === 'teacher' ? entry.metaInfo : null,
+                classroom: entry.classroom,
+                dayOfWeek,
+                startTime: startTimeSlot.start,
+                endTime: endTimeSlot.end,
+                weekType,
+                color: entry.color,
+            };
+        }))).filter(e => e.dayOfWeek >= 0 && e.dayOfWeek <= 4);
+
+        console.log(`   Found ${processedEntries.length} entries`);
+        return processedEntries;
+    };
+
+    try {
+        return await runExtraction();
+    } catch (error) {
+        if (String(error?.message || '').includes('Requesting main frame too early!')) {
+            console.log('   ↻ Frame was not ready yet, retrying once...');
+            await new Promise(r => setTimeout(r, 2000));
+            return await runExtraction();
         }
-
-        return {
-            subjectName: entry.subjectName,
-            teacherName: mode === 'class' ? entry.metaInfo : null,
-            classNames: mode === 'teacher' ? entry.metaInfo : null,
-            classroom: entry.classroom,
-            dayOfWeek,
-            startTime: startTimeSlot.start,
-            endTime: endTimeSlot.end,
-            weekType,
-            color: entry.color,
-        };
-    }).filter(e => e.dayOfWeek >= 0 && e.dayOfWeek <= 4);
-
-    console.log(`   Found ${processedEntries.length} entries`);
-    return processedEntries;
+        throw error;
+    }
 }
 
 /**
@@ -387,7 +789,8 @@ async function extractTimetable(page, targetName, mode = 'class') {
  */
 async function saveClasses(classes) {
     if (classes.length === 0) return [];
-    console.log('💾 Saving classes to Supabase...');
+    console.log(`💾 Saving ${classes.length} classes to Supabase...`);
+    console.log('   ⇢ Writing parsed class items into the database now');
 
     const { data, error } = await supabase
         .from('classes')
@@ -407,7 +810,7 @@ async function saveClasses(classes) {
         console.error('   Error:', error.message);
         return [];
     }
-    console.log(`   ✓ Saved ${data.length} classes`);
+    console.log(`   ✓ Put ${data.length} classes into the database`);
     return data;
 }
 
@@ -443,6 +846,7 @@ async function saveTeachers(teachers) {
 async function saveTimetableEntries(targetId, entries, mode = 'class') {
     if (entries.length === 0) return [];
     console.log(`💾 Saving ${entries.length} entries for ${mode}...`);
+    console.log('   ⇢ Writing timetable entries into the database now');
 
     if (mode === 'class') {
         await supabase.from('timetable_entries').delete().eq('class_id', targetId);
@@ -473,7 +877,7 @@ async function saveTimetableEntries(targetId, entries, mode = 'class') {
         console.error('   Error:', error.message);
         return [];
     }
-    console.log(`   ✓ Saved ${data.length} entries`);
+    console.log(`   ✓ Put ${data.length} timetable entries into the database`);
     return data;
 }
 
@@ -483,6 +887,8 @@ async function saveTimetableEntries(targetId, entries, mode = 'class') {
 async function scrape(testMode = false) {
     console.log('🚀 Starting UniTimetable scraper v5 (SVG parser)...');
     console.log(`   Mode: ${testMode ? 'TEST (1 class)' : 'FULL'}\n`);
+
+    const teachersOnlyMode = process.argv.includes('--teachers-only');
 
     const browser = await puppeteer.launch({
         headless: 'new',
@@ -502,14 +908,19 @@ async function scrape(testMode = false) {
         console.log('   ✓ Cookies dismissed (if any)');
         await new Promise(r => setTimeout(r, 1000));
 
-        const classes = await extractClasses(page);
-        if (classes.length === 0) {
-            console.log('❌ No classes found');
-            return;
-            // return; // Don't return if no classes, teachers might still be there
-        }
+        let savedClasses = [];
+        if (!teachersOnlyMode) {
+            const classes = await extractClasses(page);
+            if (classes.length === 0) {
+                console.log('❌ No classes found');
+                return;
+                // return; // Don't return if no classes, teachers might still be there
+            }
 
-        const savedClasses = await saveClasses(classes);
+            savedClasses = await saveClasses(classes);
+        } else {
+            console.log('🧑‍🏫 Teachers-only mode enabled: skipping class extraction and class timetable updates.');
+        }
         
         // 2. Teachers
         const rawTeachers = await extractTeachers(page);
@@ -543,21 +954,31 @@ async function scrape(testMode = false) {
         }
 
         // 3. Classes
-        const classesToProcess = testMode ? classes.slice(0, 1) : classes;
+        if (!teachersOnlyMode) {
+            const classes = savedClasses.map(savedClass => ({
+                name: savedClass.name,
+                edupageId: savedClass.edupage_id,
+            }));
+            const classesToProcess = testMode ? classes.slice(0, 1) : classes;
 
-        console.log(`\n📋 Processing ${classesToProcess.length} class(es)...\n`);
+            console.log(`\n📋 Processing ${classesToProcess.length} class(es)...\n`);
 
-        for (const classInfo of classesToProcess) {
-            const savedClass = savedClasses.find(c => c?.edupage_id === classInfo.edupageId);
-            if (!savedClass) continue;
+            for (const classInfo of classesToProcess) {
+                const savedClass = savedClasses.find(c => c?.edupage_id === classInfo.edupageId);
+                if (!savedClass) continue;
 
-            const entries = await extractTimetable(page, classInfo.name, 'class');
-            if (entries.length > 0) {
-                await saveTimetableEntries(savedClass.id, entries, 'class');
+                const entries = await extractTimetable(page, classInfo.name, 'class');
+                if (entries.length > 0) {
+                    await saveTimetableEntries(savedClass.id, entries, 'class');
+                }
+
+                await clickClassesButton(page);
+                await new Promise(r => setTimeout(r, 500));
             }
 
-            await clickClassesButton(page);
-            await new Promise(r => setTimeout(r, 500));
+            if (savedClasses.length > 0) {
+                await recheckBiweeklyClassEntries(savedClasses);
+            }
         }
 
         console.log('\n✅ Scraping complete!');

@@ -38,7 +38,7 @@
 }
 
 .animated-list-item {
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
 }
 
 .animated-list-top-gradient {
@@ -49,8 +49,8 @@
     height: 30px;
     background: linear-gradient(to bottom, rgba(18, 18, 26, 0.95), transparent);
     pointer-events: none;
-    transition: opacity 0.3s ease;
-    border-radius: 10px 10px 0 0;
+    transition: opacity 0.3s var(--ease);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .animated-list-bottom-gradient {
@@ -61,6 +61,6 @@
     height: 50px;
     background: linear-gradient(to top, rgba(18, 18, 26, 0.95), transparent);
     pointer-events: none;
-    transition: opacity 0.3s ease;
-    border-radius: 0 0 10px 10px;
+    transition: opacity 0.3s var(--ease);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
 }

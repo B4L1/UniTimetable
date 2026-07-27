@@ -2,8 +2,8 @@
 
 import { create } from 'zustand';
 import { webStorage } from './webStorage';
-import type { ClassInfo, TimetableEntry, Preferences, BackgroundTheme } from '@shared/lib/types';
-import { DEFAULT_PREFERENCES } from '@shared/lib/types';
+import type { ClassInfo, TimetableEntry, Preferences } from '@shared/lib/types';
+import { DEFAULT_PREFERENCES, migrateColorTheme, migrateBackgroundEffect } from '@shared/lib/types';
 import { 
     fetchUserPreferences, 
     upsertUserPreferences, 
@@ -109,7 +109,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 selected_class_id: classInfo.id,
                 // Include all required fields so the upsert succeeds for brand-new users
                 show_time_indicator: preferences.showTimeIndicator ?? true,
-                theme: (preferences.backgroundTheme === 'sapientia' ? 'light' : 'dark') as 'light' | 'dark',
+                theme: (preferences.colorTheme === 'light' ? 'light' : 'dark') as 'light' | 'dark',
                 language: (preferences.language ?? 'hu') as 'hu' | 'en',
             });
         }
@@ -129,7 +129,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 selected_class_id: teacher.id,
                 // Include all required fields so the upsert succeeds for brand-new users
                 show_time_indicator: preferences.showTimeIndicator ?? true,
-                theme: (preferences.backgroundTheme === 'sapientia' ? 'light' : 'dark') as 'light' | 'dark',
+                theme: (preferences.colorTheme === 'light' ? 'light' : 'dark') as 'light' | 'dark',
                 language: (preferences.language ?? 'hu') as 'hu' | 'en',
             });
         }
@@ -256,7 +256,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (user) {
             await upsertUserPreferences(user.email, {
                 show_time_indicator: updated.showTimeIndicator,
-                theme: updated.backgroundTheme === 'sapientia' ? 'light' : 'dark', // Map to DB schema
+                theme: updated.colorTheme === 'light' ? 'light' : 'dark', // Map to DB schema
                 // updated_at is handled in upsert function
             });
         }
@@ -281,12 +281,13 @@ export const useAppStore = create<AppState>((set, get) => ({
                 // If remote data exists, merge it into local state and storage
                 const updates: Partial<AppState> = {};
                 
+                let updatedUser = user;
                 if (remotePrefs) {
                     // Update user's selectionId based on remote preferences
                     if (remotePrefs.selected_class_id) {
-                        user.selectionId = remotePrefs.selected_class_id;
+                        updatedUser = { ...user, selectionId: remotePrefs.selected_class_id };
                     }
-                    
+
                     const updatedPrefs = {
                         ...get().preferences,
                         showTimeIndicator: remotePrefs.show_time_indicator ?? get().preferences.showTimeIndicator,
@@ -294,6 +295,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                     };
                     updates.preferences = updatedPrefs;
                     await webStorage.setPreferences(updatedPrefs);
+                }
+
+                if (updatedUser !== user) {
+                    updates.user = updatedUser;
+                    await webStorage.setUser(updatedUser);
                 }
                 
                 if (remoteSelections.length > 0) {
@@ -327,10 +333,25 @@ export const useAppStore = create<AppState>((set, get) => ({
                 webStorage.getUser(),
             ]);
 
-            // Merge stored preferences with defaults
-            const preferences: Preferences = storedPrefs
+            // Merge stored preferences with defaults.
+            // v3 migration: derive colorTheme from the pre-v3 combined
+            // backgroundTheme value, and seed the device-local background
+            // effect from it exactly once.
+            const merged = storedPrefs
                 ? { ...DEFAULT_PREFERENCES, ...storedPrefs }
                 : DEFAULT_PREFERENCES;
+            const preferences: Preferences = {
+                ...merged,
+                colorTheme: migrateColorTheme(storedPrefs),
+            };
+            if (storedPrefs && !storedPrefs.colorTheme && storedPrefs.backgroundTheme) {
+                const legacyEffect = migrateBackgroundEffect(storedPrefs);
+                if (legacyEffect !== 'none' && !localStorage.getItem('uni-bg-effect')) {
+                    localStorage.setItem('uni-bg-effect', legacyEffect);
+                }
+                delete preferences.backgroundTheme;
+                await webStorage.setPreferences(preferences);
+            }
 
             set({
                 isFirstLaunch: isFirst,

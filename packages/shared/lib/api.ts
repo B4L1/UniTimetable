@@ -11,6 +11,95 @@ export interface AvailableClassEntry extends TimetableEntry {
     shared_classes?: string[];
 }
 
+// ---------------------------------------------------------------------------
+// v3 dual-read adapter (SPEC_V3_PLAN.md Phase 2)
+//
+// Entry reads go to the v3 `events` table when migration 002 has been applied,
+// and fall back to `timetable_entries` otherwise. The two differ only in a few
+// column names; `entriesSource()` hides that so each fetch function has a
+// single code path. Old tables stay authoritative for writes until Phase 5.
+// ---------------------------------------------------------------------------
+
+/** timetable_entries column name → events column name */
+const V3_COL_MAP: Record<string, string> = {
+    class_id: 'group_id',
+    day_of_week: 'day',
+    teacher_name: 'teacher',
+    classroom: 'room',
+    scraped_at: 'last_updated',
+};
+
+/** Map a v3 `events` row to the TimetableEntry shape the app consumes. */
+export function mapEventRowToEntry(e: any): TimetableEntry {
+    return {
+        id: e.id,
+        class_id: e.group_id,
+        subject_name: e.subject_name,
+        teacher_code: null,
+        teacher_name: e.teacher ?? null,
+        classroom: e.room ?? null,
+        day_of_week: e.day,
+        start_time: e.start_time,
+        end_time: e.end_time,
+        week_type: e.week_type,
+        color: null,
+        scraped_at: e.last_updated,
+        course_id: e.course_id,
+        event_type: e.type,
+        week_type_source: e.week_type_source,
+        source_hash: e.source_hash ?? null,
+    };
+}
+
+let v3Available: boolean | null = null;
+
+/**
+ * True once migration 002 is live: the `events` table exists AND is non-empty
+ * (an empty table would mean a partial migration — safer to keep reading the
+ * old one). Probed once per session, cached.
+ */
+export async function isV3DataModelAvailable(): Promise<boolean> {
+    if (v3Available !== null) return v3Available;
+    try {
+        const { count, error } = await supabase
+            .from('events')
+            .select('id', { count: 'exact', head: true });
+        v3Available = !error && (count ?? 0) > 0;
+    } catch {
+        v3Available = false;
+    }
+    return v3Available;
+}
+
+/** Reset the cached probe (tests / after running the migration mid-session). */
+export function resetV3Detection(): void {
+    v3Available = null;
+}
+
+interface EntriesSource {
+    table: 'events' | 'timetable_entries';
+    /** Translate a timetable_entries column name for this source. */
+    col: (name: string) => string;
+    /** Normalize raw rows from this source to TimetableEntry[]. */
+    mapRows: (rows: any[]) => TimetableEntry[];
+}
+
+async function entriesSource(): Promise<EntriesSource> {
+    const useV3 = await isV3DataModelAvailable();
+    if (useV3) {
+        return {
+            table: 'events',
+            col: (name) => V3_COL_MAP[name] ?? name,
+            mapRows: (rows) => rows.map(mapEventRowToEntry),
+        };
+    }
+    return {
+        table: 'timetable_entries',
+        col: (name) => name,
+        mapRows: (rows) => rows as TimetableEntry[],
+    };
+}
+
 /**
  * Fetch all classes from Supabase
  */
@@ -36,15 +125,39 @@ export async function fetchClasses(): Promise<ClassData[]> {
 }
 
 /**
+ * Fetch a single class by ID
+ */
+export async function fetchClassById(classId: string): Promise<ClassData | null> {
+    try {
+        const { data, error } = await supabase
+            .from('classes')
+            .select('*')
+            .eq('id', classId)
+            .single();
+
+        if (error) {
+            console.error('Error fetching class by id:', error.message);
+            return null;
+        }
+
+        return data || null;
+    } catch (err) {
+        console.error('Failed to fetch class by id:', err);
+        return null;
+    }
+}
+
+/**
  * Fetch timetable entries for a specific class
  */
 export async function fetchTimetableEntries(classId: string): Promise<TimetableEntry[]> {
     try {
+        const src = await entriesSource();
         const { data, error } = await supabase
-            .from('timetable_entries')
+            .from(src.table)
             .select('*')
-            .eq('class_id', classId)
-            .order('day_of_week')
+            .eq(src.col('class_id'), classId)
+            .order(src.col('day_of_week'))
             .order('start_time');
 
         if (error) {
@@ -52,12 +165,14 @@ export async function fetchTimetableEntries(classId: string): Promise<TimetableE
             return [];
         }
 
+        const entries = src.mapRows(data || []);
+
         // Cache the data locally
-        if (data && data.length > 0) {
-            await storage.setTimetableCache(data);
+        if (entries.length > 0) {
+            await storage.setTimetableCache(entries);
         }
 
-        return data || [];
+        return entries;
     } catch (err) {
         console.error('Failed to fetch timetable:', err);
         // Try to return cached data
@@ -91,33 +206,34 @@ export async function fetchAvailableClassesForPlanner(classId: string, importSub
         if (!siblingClasses || siblingClasses.length === 0) return [];
 
         const siblingIds = siblingClasses.map(sc => sc.id);
+        const src = await entriesSource();
         let entries: TimetableEntry[] = [];
 
         // Strategy 1: Standard Cohort Fetch
         const { data: standardEntries, error } = await supabase
-            .from('timetable_entries')
+            .from(src.table)
             .select('*')
-            .in('class_id', siblingIds)
-            .order('day_of_week')
+            .in(src.col('class_id'), siblingIds)
+            .order(src.col('day_of_week'))
             .order('start_time');
 
         if (error) throw error;
-        entries = standardEntries || [];
+        entries = src.mapRows(standardEntries || []);
 
         // Strategy 2: Imported Subjects (Specific User Selections)
         if (importSubjects.length > 0) {
             // Fetch ALL entries for the imported subjects, regardless of faculty/year
             const { data: importedEntries } = await supabase
-                .from('timetable_entries')
+                .from(src.table)
                 .select('*')
                 .in('subject_name', importSubjects)
-                .order('day_of_week')
+                .order(src.col('day_of_week'))
                 .order('start_time');
 
             if (importedEntries) {
                 // Merge, avoiding duplicates if they already exist in standard entries (e.g. if I import a subject I already have)
                 const existingIds = new Set(entries.map(e => e.id));
-                importedEntries.forEach(ie => {
+                src.mapRows(importedEntries).forEach(ie => {
                     if (!existingIds.has(ie.id)) {
                         entries.push(ie);
                         existingIds.add(ie.id);
@@ -130,9 +246,9 @@ export async function fetchAvailableClassesForPlanner(classId: string, importSub
         if (includeCrossMajor) {
             // A. Get subjects of cohort
             const { data: subjectData } = await supabase
-                .from('timetable_entries')
+                .from(src.table)
                 .select('subject_name')
-                .in('class_id', siblingIds);
+                .in(src.col('class_id'), siblingIds);
 
             if (subjectData) {
                 const uniqueSubjects = Array.from(new Set(subjectData.map(s => s.subject_name)));
@@ -143,15 +259,15 @@ export async function fetchAvailableClassesForPlanner(classId: string, importSub
                 if (subjectsToFetch.length > 0) {
                     // B. Fetch all entries with these subjects
                     const { data: allEntries } = await supabase
-                        .from('timetable_entries')
+                        .from(src.table)
                         .select('*')
                         .in('subject_name', subjectsToFetch)
-                        .order('day_of_week')
+                        .order(src.col('day_of_week'))
                         .order('start_time');
 
                     if (allEntries) {
                         const existingIds = new Set(entries.map(e => e.id));
-                        allEntries.forEach(ae => {
+                        src.mapRows(allEntries).forEach(ae => {
                             if (!existingIds.has(ae.id)) {
                                 entries.push(ae);
                                 existingIds.add(ae.id);
@@ -209,11 +325,12 @@ export async function fetchTimetableEntriesForFacultyYear(faculty: string, year:
         const siblingIds = siblingClasses.map(sc => sc.id);
 
         // 2. Fetch all timetable entries for these classes
+        const src = await entriesSource();
         const { data: entries, error } = await supabase
-            .from('timetable_entries')
+            .from(src.table)
             .select('*')
-            .in('class_id', siblingIds)
-            .order('day_of_week')
+            .in(src.col('class_id'), siblingIds)
+            .order(src.col('day_of_week'))
             .order('start_time');
 
         if (error) {
@@ -221,7 +338,7 @@ export async function fetchTimetableEntriesForFacultyYear(faculty: string, year:
             return [];
         }
 
-        return entries || [];
+        return src.mapRows(entries || []);
     } catch (err) {
         console.error('Failed to fetch faculty year entries:', err);
         return [];
@@ -284,11 +401,12 @@ export async function fetchTimetableEntriesByIds(entryIds: string[]): Promise<Av
     if (entryIds.length === 0) return [];
 
     try {
-        const { data: entries, error } = await supabase
-            .from('timetable_entries')
+        const src = await entriesSource();
+        const { data: rawEntries, error } = await supabase
+            .from(src.table)
             .select('*')
             .in('id', entryIds)
-            .order('day_of_week')
+            .order(src.col('day_of_week'))
             .order('start_time');
 
         if (error) {
@@ -296,7 +414,8 @@ export async function fetchTimetableEntriesByIds(entryIds: string[]): Promise<Av
             return [];
         }
 
-        if (!entries || entries.length === 0) return [];
+        if (!rawEntries || rawEntries.length === 0) return [];
+        const entries = src.mapRows(rawEntries);
 
         // Fetch class names
         const classIds = Array.from(new Set(entries.map(e => e.class_id)));
@@ -325,8 +444,9 @@ export async function searchTimetableEntriesBySubject(query: string): Promise<Av
 
     try {
         // 1. Search entries
-        const { data: entries, error } = await supabase
-            .from('timetable_entries')
+        const src = await entriesSource();
+        const { data: rawEntries, error } = await supabase
+            .from(src.table)
             .select('*')
             .ilike('subject_name', `%${query}%`)
             .order('subject_name')
@@ -337,7 +457,8 @@ export async function searchTimetableEntriesBySubject(query: string): Promise<Av
             return [];
         }
 
-        if (!entries || entries.length === 0) return [];
+        if (!rawEntries || rawEntries.length === 0) return [];
+        const entries = src.mapRows(rawEntries);
 
         // 2. Fetch class names for context
         const classIds = Array.from(new Set(entries.map(e => e.class_id)));
@@ -463,6 +584,79 @@ export async function updateUserSelections(userId: string, entryIds: string[]): 
     }
 }
 
+// ---------------------------------------------------------------------------
+// user_event_preferences (v3 Phase 5 — lock/exclude, spec §A13)
+// One row per (user, event) that the user has locked and/or excluded. A row
+// with both flags false is meaningless, so we delete it instead of storing it.
+// ---------------------------------------------------------------------------
+
+export interface UserEventPreferences {
+    /** event ids the user pinned — the generator must keep these */
+    locked: string[];
+    /** event ids the user banned — the generator must never reintroduce */
+    excluded: string[];
+}
+
+export async function fetchUserEventPreferences(userId: string): Promise<UserEventPreferences> {
+    try {
+        const { data, error } = await supabase
+            .from('user_event_preferences')
+            .select('event_id, locked, excluded')
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error('Error fetching user event preferences:', error.message);
+            return { locked: [], excluded: [] };
+        }
+
+        const locked: string[] = [];
+        const excluded: string[] = [];
+        for (const row of data ?? []) {
+            if (row.locked) locked.push(row.event_id);
+            if (row.excluded) excluded.push(row.event_id);
+        }
+        return { locked, excluded };
+    } catch (err) {
+        console.error('Failed to fetch user event preferences:', err);
+        return { locked: [], excluded: [] };
+    }
+}
+
+/**
+ * Set (or clear) one event's lock/exclude flags for a user. When both flags
+ * are false the row is deleted so the table only ever holds meaningful state.
+ */
+export async function setUserEventPreference(
+    userId: string,
+    eventId: string,
+    flags: { locked: boolean; excluded: boolean },
+): Promise<void> {
+    try {
+        if (!flags.locked && !flags.excluded) {
+            const { error } = await supabase
+                .from('user_event_preferences')
+                .delete()
+                .eq('user_id', userId)
+                .eq('event_id', eventId);
+            if (error) console.error('Error clearing event preference:', error.message);
+            return;
+        }
+
+        const { error } = await supabase
+            .from('user_event_preferences')
+            .upsert({
+                user_id: userId,
+                event_id: eventId,
+                locked: flags.locked,
+                excluded: flags.excluded,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id,event_id' });
+        if (error) console.error('Error upserting event preference:', error.message);
+    } catch (err) {
+        console.error('Failed to set user event preference:', err);
+    }
+}
+
 /**
  * Fetch all teachers from Supabase
  */
@@ -487,6 +681,10 @@ export async function fetchTeachers(): Promise<Teacher[]> {
 
 /**
  * Fetch timetable entries for a specific teacher
+ *
+ * Stays on timetable_entries even in dual-read mode: `events` has no
+ * teacher_id column (only the teacher display name). Moves over in Phase 6
+ * when the scraper writes events directly.
  */
 export async function fetchTeacherTimetable(teacherId: string): Promise<TimetableEntry[]> {
     try {

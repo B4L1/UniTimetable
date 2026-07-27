@@ -5,7 +5,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 import { useAppStore, TimetableEntry } from '@/stores/appStore';
-import { fetchTimetableEntries } from '@unitimetable/shared';
+import { fetchTimetableEntries, getSubjectColor, getCurrentWeekParity, assignSubjectColors } from '@unitimetable/shared';
+import { palette, radius } from '@/constants/theme';
+import { syncWidget } from '@/widget/widget-sync';
 
 const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
 const DAYS_SHORT = ['H', 'K', 'Sz', 'Cs', 'P'];
@@ -55,14 +57,6 @@ function getMinutes(timeStr: string): number {
     return (h || 0) * 60 + (m || 0);
 }
 
-// Get current week type
-function getCurrentWeekType(): 'odd' | 'even' {
-    const now = new Date();
-    const semesterStart = new Date(2026, 1, 9); // Feb 9, 2026
-    const weekNum = Math.ceil((now.getTime() - semesterStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    return weekNum % 2 === 0 ? 'even' : 'odd';
-}
-
 // Get current time position for the indicator
 function getCurrentTimePosition(): { slotIndex: number; progress: number } | null {
     const now = new Date();
@@ -89,9 +83,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const SLOT_HEIGHT = 100;
 
 export default function TimetableScreen() {
-    console.log('Rendering TimetableScreen');
     const { selectedClass, timetableEntries, setTimetableEntries } = useAppStore();
-    console.log('AppStore state:', { selectedClass, timetableEntriesCount: timetableEntries.length });
     const [currentDayIndex, setCurrentDayIndex] = useState(Math.min(new Date().getDay() - 1, 4));
     const [timePos, setTimePos] = useState(getCurrentTimePosition());
     const pagerRef = useRef<PagerView>(null);
@@ -102,11 +94,14 @@ export default function TimetableScreen() {
         if (day === 0 || day === 6) setCurrentDayIndex(0);
     }, []);
 
-    // Load timetable data
+    // Load timetable data (and refresh the home-screen widget with it)
     useEffect(() => {
         if (selectedClass?.id) {
             fetchTimetableEntries(selectedClass.id).then((entries) => {
-                setTimetableEntries(entries);
+                if (entries.length > 0) {
+                    setTimetableEntries(entries);
+                    syncWidget(entries);
+                }
             });
         }
     }, [selectedClass?.id]);
@@ -119,7 +114,15 @@ export default function TimetableScreen() {
         return () => clearInterval(interval);
     }, []);
 
-    const weekType = getCurrentWeekType();
+    // Deterministic subject colors: assign from the full (sorted) subject set
+    // so cards match the home-screen widget exactly.
+    useEffect(() => {
+        if (timetableEntries.length > 0) {
+            assignSubjectColors(timetableEntries.map(e => e.subject_name));
+        }
+    }, [timetableEntries]);
+
+    const weekType = getCurrentWeekParity();
 
     // Get entries for a 2-hour combined slot
     const getEntriesForSlot = useCallback(
@@ -228,8 +231,19 @@ export default function TimetableScreen() {
                                             )}
 
                                             {slotEntries.length > 0 ? (
-                                                slotEntries.map((entry, i) => (
-                                                    <View key={i} style={styles.classCard}>
+                                                slotEntries.map((entry, i) => {
+                                                    const subjectColor = getSubjectColor(entry.subject_name);
+                                                    return (
+                                                    <View
+                                                        key={i}
+                                                        style={[
+                                                            styles.classCard,
+                                                            {
+                                                                backgroundColor: `${subjectColor}80`,
+                                                                borderColor: `${subjectColor}`,
+                                                            },
+                                                        ]}
+                                                    >
                                                         <Text style={styles.className} numberOfLines={2}>
                                                             {entry.subject_name}
                                                         </Text>
@@ -249,7 +263,8 @@ export default function TimetableScreen() {
                                                             )}
                                                         </View>
                                                     </View>
-                                                ))
+                                                    );
+                                                })
                                             ) : (
                                                 <View style={styles.emptySlot}>
                                                     <Text style={styles.emptySlotText}>-</Text>
@@ -270,7 +285,7 @@ export default function TimetableScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0f0f23',
+        backgroundColor: palette.bgPrimary,
     },
     // Day selector
     daySelector: {
@@ -290,7 +305,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
     },
     dayPillActive: {
-        backgroundColor: '#818cf8',
+        backgroundColor: palette.accent,
     },
     dayPillText: {
         fontSize: 15,
@@ -365,12 +380,10 @@ const styles = StyleSheet.create({
         zIndex: 10,
         borderRadius: 1,
     },
-    // Class card
+    // Class card — subject-colored, mirrors web .class-card
     classCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 12,
-        borderLeftWidth: 4,
-        borderLeftColor: '#818cf8',
+        borderRadius: radius.md,
+        borderWidth: 1,
         padding: 12,
         marginBottom: 4,
         minHeight: SLOT_HEIGHT - 8,
@@ -381,10 +394,13 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#ffffff',
         marginBottom: 4,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     classTeacher: {
         fontSize: 13,
-        color: 'rgba(255, 255, 255, 0.6)',
+        color: 'rgba(255, 255, 255, 0.85)',
         marginBottom: 4,
     },
     classRoomRow: {
@@ -394,16 +410,17 @@ const styles = StyleSheet.create({
     },
     classRoom: {
         fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontWeight: '500',
+        color: 'rgba(255, 255, 255, 0.9)',
     },
     weekBadge: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#818cf8',
-        backgroundColor: 'rgba(129, 140, 248, 0.15)',
+        color: '#ffffff',
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
         paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 4,
+        borderRadius: radius.xs,
         overflow: 'hidden',
     },
     // Empty slot

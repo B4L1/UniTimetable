@@ -9,7 +9,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function resetDatabase() {
     console.log('⚠️  WARNING: This will delete ALL data from the database!');
-    console.log('Tables to be cleared: user_selections, timetable_entries, classes');
+    console.log('Tables to be cleared: user_selections, timetable_entries, classes, teachers, user_preferences');
     console.log('Waiting 5 seconds before starting... (Ctrl+C to cancel)');
 
     await new Promise(resolve => setTimeout(resolve, 5000));
@@ -42,6 +42,24 @@ async function resetDatabase() {
         if (errorClasses) console.error('Error clearing classes:', errorClasses.message);
         else console.log('   ✓ Cleared classes');
 
+        console.log('🗑️  Deleting teachers...');
+        const { error: errorTeachers } = await supabase
+            .from('teachers')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+
+        if (errorTeachers) console.error('Error clearing teachers:', errorTeachers.message);
+        else console.log('   ✓ Cleared teachers');
+
+        console.log('🗑️  Deleting user_preferences...');
+        const { error: errorPreferences } = await supabase
+            .from('user_preferences')
+            .delete()
+            .neq('user_id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+
+        if (errorPreferences) console.error('Error clearing user_preferences:', errorPreferences.message);
+        else console.log('   ✓ Cleared user_preferences');
+
         console.log('\n✅ Database reset complete. You can now run the scraper to populate new data.');
 
     } catch (error) {
@@ -49,4 +67,14 @@ async function resetDatabase() {
     }
 }
 
+// Test section
+function testTablesList() {
+    const tables = ['user_selections', 'timetable_entries', 'classes', 'teachers', 'user_preferences'];
+    console.log(`\n📋 Test: Database tables to be cleared`);
+    console.log(`   Total tables: ${tables.length}`);
+    console.log(`   Last table: ${tables[tables.length - 1]}`);
+    console.log(`   All tables: ${tables.join(', ')}\n`);
+}
+
+testTablesList();
 resetDatabase();

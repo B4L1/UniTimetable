@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/appStore';
-import { supabase, AvailableClassEntry, TimetableEntry } from '@unitimetable/shared';
+import { supabase, fetchTimetableEntriesForFacultyYear, AvailableClassEntry, TimetableEntry } from '@unitimetable/shared';
 
 const DAYS = ['Hé', 'Ke', 'Sz', 'Cs', 'Pé'];
 
@@ -77,17 +77,12 @@ export default function PlannerScreen() {
                 return;
             }
 
-            const classIds = allClasses.map((c) => c.id);
-
             // Get all timetable entries for those classes
-            const { data: entries } = await supabase
-                .from('timetable_entries')
-                .select('*')
-                .in('class_id', classIds)
-                .order('day_of_week')
-                .order('start_time');
+            // (goes through the shared API so the v3 dual-read adapter applies)
+            const entries = await fetchTimetableEntriesForFacultyYear(
+                selectedClass.faculty, selectedClass.year);
 
-            if (!entries) {
+            if (entries.length === 0) {
                 setLoading(false);
                 return;
             }
@@ -348,7 +343,7 @@ const CELL_SIZE = 56;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0f0f23',
+        backgroundColor: '#12121a',
     },
     title: {
         fontSize: 28,
@@ -430,7 +425,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#1a1a2e',
+        backgroundColor: '#1a1a24',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         paddingHorizontal: 20,

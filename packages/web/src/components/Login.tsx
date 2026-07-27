@@ -3,19 +3,8 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
 import { fetchUserPreferences } from '@shared/index';
-import type { BackgroundTheme } from '@shared/lib/types';
+import { toggleLightDark, isLightTheme } from '../utils/theme';
 import './Login.css';
-
-const LAST_DARK_THEME_KEY = 'uni-last-dark-theme';
-const DARK_THEMES: BackgroundTheme[] = ['none', 'aurora', 'pixel-blast', 'silk', 'beams', 'dither', 'iridescence', 'liquid-chrome', 'faulty-terminal'];
-
-function withViewTransition(update: () => void) {
-    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
-        (document as any).startViewTransition(update);
-    } else {
-        update();
-    }
-}
 
 const SunIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -42,18 +31,9 @@ const Login: React.FC = () => {
     const { setUser, preferences, updatePreferences } = useAppStore();
     const [isAuthenticating, setIsAuthenticating] = React.useState(false);
 
-    const isLight = preferences.backgroundTheme === 'sapientia';
+    const isLight = isLightTheme(preferences.colorTheme);
 
-    const toggleTheme = () => {
-        if (isLight) {
-            const stored = localStorage.getItem(LAST_DARK_THEME_KEY) as BackgroundTheme | null;
-            const target = (stored && DARK_THEMES.includes(stored)) ? stored : 'none';
-            withViewTransition(() => updatePreferences({ backgroundTheme: target }));
-        } else {
-            localStorage.setItem(LAST_DARK_THEME_KEY, preferences.backgroundTheme);
-            withViewTransition(() => updatePreferences({ backgroundTheme: 'sapientia' }));
-        }
-    };
+    const toggleTheme = () => toggleLightDark(preferences.colorTheme, updatePreferences);
 
     const handleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse: any) => {
@@ -71,8 +51,9 @@ const Login: React.FC = () => {
                 const name = decoded.name;
                 const picture = decoded.picture;
 
-                // Role Assignment
-                const role = email.endsWith('@student.ms.sapientia.ro') ? 'student' : 'teacher';
+                // TEMP: Treat everyone as a student while no teachers use the app
+                // TODO: Restore domain-based role assignment once teacher flow is needed
+                const role: 'student' | 'teacher' = 'student';
 
                 // 1. Fetch preferences from Supabase first
                 const prefs = await fetchUserPreferences(email);
@@ -91,12 +72,10 @@ const Login: React.FC = () => {
                 // 3. Set user (this triggers App.tsx redirect)
                 setUser(user);
 
-                // 4. Navigate to the appropriate page
-                if (selectionId) {
-                    navigate('/');
-                } else {
-                    navigate('/onboarding');
-                }
+                // TEMP: Always redirect to onboarding/class selection for now
+                // TODO: Remove this when teachers start using the app
+                // In the future, check if (selectionId) to skip onboarding for returning students
+                navigate('/onboarding');
             } catch (err) {
                 console.error('Failed to fetch user info:', err);
                 setIsAuthenticating(false);

@@ -1,9 +1,12 @@
 // Main App component
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense, lazy } from 'react';
 import { useAppStore } from './stores/appStore';
 import Timetable from './components/Timetable';
 import Planner from './components/Planner';
+
+// Phase 4 stepper — lazy: the timetable is the critical path (B10 budget)
+const PlannerWizard = lazy(() => import('./components/PlannerWizard'));
 import Settings from './components/Settings';
 import BackgroundSelector from './components/backgrounds/BackgroundSelector';
 import Welcome from './components/Welcome';
@@ -13,53 +16,14 @@ import Dock, { type DockItemData } from './components/Dock';
 import MobileMenu from './components/MobileMenu';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { formatClassName } from './utils/format';
-import type { BackgroundTheme } from '@shared/lib/types';
-import { setSubjectPalette, DEFAULT_SUBJECT_COLORS } from '@shared/index';
+import { toggleLightDark, isLightTheme } from './utils/theme';
+import { setSubjectPalette, assignSubjectColors } from '@shared/index';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import Onboarding from './components/Onboarding';
 import './index.css';
 
-type Tab = 'timetable' | 'planner' | 'settings' | 'privacy';
-
-// Theme list for cycling
-const BACKGROUND_THEMES: BackgroundTheme[] = [
-  'none', 'sapientia', 'aurora', 'pixel-blast',
-  'iridescence', 'liquid-chrome', 'faulty-terminal'
-];
-
-// All themes except sapientia are dark
-const DARK_THEMES: BackgroundTheme[] = BACKGROUND_THEMES.filter(t => t !== 'sapientia');
-
-// localStorage key for remembering the last dark theme used
-const LAST_DARK_THEME_KEY = 'uni-last-dark-theme';
-
-/** Wrap a state update in a View Transition if the browser supports it */
-function withViewTransition(update: () => void) {
-  if (typeof document !== 'undefined' && 'startViewTransition' in document) {
-    (document as any).startViewTransition(update);
-  } else {
-    update();
-  }
-}
-
-/** Toggle between sapientia (light) and the last dark theme, with smooth animation */
-function buildToggleTheme(
-  currentTheme: BackgroundTheme,
-  updatePreferences: (p: Partial<{ backgroundTheme: BackgroundTheme }>) => void,
-) {
-  const isLight = currentTheme === 'sapientia';
-  if (isLight) {
-    // Switching to dark — restore the last used dark theme
-    const stored = localStorage.getItem(LAST_DARK_THEME_KEY) as BackgroundTheme | null;
-    const target = (stored && DARK_THEMES.includes(stored)) ? stored : 'none';
-    withViewTransition(() => updatePreferences({ backgroundTheme: target }));
-  } else {
-    // Switching to light — remember current dark theme first
-    localStorage.setItem(LAST_DARK_THEME_KEY, currentTheme);
-    withViewTransition(() => updatePreferences({ backgroundTheme: 'sapientia' }));
-  }
-}
+type Tab = 'timetable' | 'planner' | 'wizard' | 'settings' | 'privacy';
 
 // Clean SVG icons
 const CalendarIcon = () => (
@@ -120,6 +84,21 @@ const SaveIcon = () => (
   </svg>
 );
 
+const DownloadIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+const SparklesIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3l1.9 5.7L19.5 10l-5.6 1.3L12 17l-1.9-5.7L4.5 10l5.6-1.3L12 3z" />
+    <path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9L19 15z" />
+  </svg>
+);
+
 const ManageIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="7" height="7" />
@@ -131,7 +110,7 @@ const ManageIcon = () => (
 );
 
 function App() {
-  const { initialize, isLoading, preferences, updatePreferences, selectedClass, isFirstLaunch, isFaultyTerminalUnlocked, user } = useAppStore();
+  const { initialize, isLoading, preferences, updatePreferences, selectedClass, isFirstLaunch, user } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -143,11 +122,13 @@ function App() {
   const [showImportModal, setShowImportModal] = useState(false);
   const isMobile = useMediaQuery('(max-width: 768px)');
   const plannerSaveRef = useRef<(() => void) | null>(null);
+  const timetableExportRef = useRef<(() => Promise<void>) | null>(null);
 
   // Derive active tab from pathname
   const activeTab: Tab = useMemo(() => {
     const path = location.pathname;
     if (path === '/planner') return 'planner';
+    if (path === '/wizard') return 'wizard';
     if (path === '/settings') return 'settings';
     if (path === '/privacy') return 'privacy';
     return 'timetable';
@@ -163,45 +144,21 @@ function App() {
     initialize();
   }, []);
 
-  // Toggle Light/Dark theme — restores last dark theme when switching back
-  const toggleTheme = () => buildToggleTheme(preferences.backgroundTheme, updatePreferences);
-
-  // Handle save from dock (calls Planner's save function)
-  const handleSave = () => {
-    if (plannerSaveRef.current) {
-      plannerSaveRef.current();
-    }
-  };
-
-  // Sync theme color palette synchronously before children render
+  // Assign subject colors synchronously before children render.
+  // v3: one muted palette for every theme (spec §4.3) — assignments stay
+  // deterministic and identical to the mobile app / widget.
   useMemo(() => {
-    // Apply Sapientia specific class colors
-    if (preferences.backgroundTheme === 'sapientia') {
-      const sapientiaPalette = [
-        '#719EB5', // Muted Blue
-        '#7CA193', // Sage Green
-        '#C66953', // Terracotta Red
-        '#968DCA', // Soft Purple
-        '#E99F79', // Peach Orange
-        '#89B4B4', // Dusty Teal
-        '#C48696', // Dusty Rose
-        '#D0A55D', // Muted Gold
-        '#92A374', // Faded Olive
-        '#7D8DAB', // Dusty Indigo
-        '#B49082', // Warm Taupe
-        '#8FA4C2', // Periwinkle
-      ];
-      setSubjectPalette(sapientiaPalette);
-    } else {
-      setSubjectPalette(null); // Reset to default vibrant palette
+    setSubjectPalette(null);
+    const entries = useAppStore.getState().timetableEntries;
+    if (entries.length > 0) {
+      assignSubjectColors(entries.map(e => e.subject_name));
     }
-
-  }, [preferences.backgroundTheme]);
+  }, []);
 
   // Handle DOM mutations safely after render
   useEffect(() => {
-    document.body.dataset.theme = preferences.backgroundTheme;
-  }, [preferences.backgroundTheme]);
+    document.body.dataset.theme = preferences.colorTheme;
+  }, [preferences.colorTheme]);
 
   if (isLoading) {
     return (
@@ -247,6 +204,7 @@ function App() {
               setShowImportModal={setShowImportModal}
               isMobile={isMobile}
               plannerSaveRef={plannerSaveRef}
+              timetableExportRef={timetableExportRef}
             />
           )
         }
@@ -276,6 +234,7 @@ interface MainLayoutProps {
   setShowImportModal: (b: boolean) => void;
   isMobile: boolean;
   plannerSaveRef: React.MutableRefObject<(() => void) | null>;
+  timetableExportRef: React.MutableRefObject<(() => Promise<void>) | null>;
 }
 
 function MainAppLayout({
@@ -283,7 +242,7 @@ function MainAppLayout({
   isFirstLaunch, selectionCount, setSelectionCount, plannerSearchQuery,
   setPlannerSearchQuery, includeCrossMajor, setIncludeCrossMajor,
   isSaving, setIsSaving, isMobileMenuOpen, setIsMobileMenuOpen,
-  showImportModal, setShowImportModal, isMobile, plannerSaveRef
+  showImportModal, setShowImportModal, isMobile, plannerSaveRef, timetableExportRef
 }: MainLayoutProps) {
 
   const handleSave = () => {
@@ -292,62 +251,89 @@ function MainAppLayout({
     }
   };
 
+  const handleExportImage = () => {
+    if (timetableExportRef.current) {
+      timetableExportRef.current();
+    }
+  };
+
   if (isFirstLaunch || !selectedClass) {
     return <Welcome />;
   }
 
-  // Build dock items
-  const dockItems: DockItemData[] = [
+  // Constant block: tabs + settings + theme toggle. These are ALWAYS the
+  // rightmost items in this exact order, so they never move on tab switch —
+  // all tab-specific items enter/leave on their LEFT.
+  const constantItems: DockItemData[] = [
     {
+      id: 'tab-timetable',
       icon: <CalendarIcon />,
       label: 'Órarend',
       onClick: () => setActiveTab('timetable'),
       active: activeTab === 'timetable',
     },
     {
+      id: 'tab-planner',
       icon: <EditIcon />,
       label: 'Tervező',
       onClick: () => setActiveTab('planner'),
       active: activeTab === 'planner',
     },
     {
+      id: 'tab-settings',
       icon: <SettingsIcon />,
       label: 'Beállítások',
       onClick: () => setActiveTab('settings'),
       active: activeTab === 'settings',
     },
-    ...(activeTab === 'timetable' ? [{
-      icon: <ClockIcon />,
-      label: 'Idő jelző',
-      onClick: () => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator }),
-      active: preferences.showTimeIndicator,
-      variant: 'toggle',
-    } as DockItemData] : []),
     {
-      icon: preferences.backgroundTheme !== 'sapientia' ? <SunIcon /> : <MoonIcon />,
-      label: preferences.backgroundTheme !== 'sapientia' ? 'Világos mód' : 'Sötét mód',
-      onClick: () => buildToggleTheme(preferences.backgroundTheme, updatePreferences),
+      id: 'theme-toggle',
+      icon: !isLightTheme(preferences.colorTheme) ? <SunIcon /> : <MoonIcon />,
+      label: !isLightTheme(preferences.colorTheme) ? 'Világos mód' : 'Sötét mód',
+      onClick: () => toggleLightDark(preferences.colorTheme, updatePreferences),
     },
   ];
 
-  if (activeTab === 'planner') {
-    dockItems.push({
-      icon: <ManageIcon />,
-      label: 'Tárgy kezelés',
-      onClick: () => setShowImportModal(true),
-      className: 'manage-subjects-btn',
-    });
-    dockItems.push({
-      icon: <SaveIcon />,
-      label: isSaving ? 'Mentés...' : 'Mentés',
-      onClick: handleSave,
-    });
+  const tabSpecificItems: DockItemData[] = [];
+  if (activeTab === 'timetable') {
+    tabSpecificItems.push(
+      { id: 'time-indicator', icon: <ClockIcon />, label: 'Idő jelző', onClick: () => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator }), active: preferences.showTimeIndicator, variant: 'toggle' } as DockItemData,
+      { id: 'export-image', icon: <DownloadIcon />, label: 'Exportálás képként', onClick: handleExportImage } as DockItemData,
+    );
   }
+  if (activeTab === 'planner') {
+    // The wizard lives on the planner tab (it replaces this planner in
+    // Phase 5) — not a permanent tab.
+    tabSpecificItems.push(
+      {
+        id: 'open-wizard',
+        icon: <SparklesIcon />,
+        label: 'Generáló',
+        onClick: () => setActiveTab('wizard'),
+      },
+      {
+        id: 'manage-subjects',
+        icon: <ManageIcon />,
+        label: 'Tárgy kezelés',
+        onClick: () => setShowImportModal(true),
+        className: 'manage-subjects-btn',
+      },
+      {
+        id: 'save',
+        icon: <SaveIcon />,
+        label: isSaving ? 'Mentés...' : 'Mentés',
+        onClick: handleSave,
+      },
+    );
+  }
+
+  // Mobile menu: constants first read better in a vertical list.
+  const menuItems: DockItemData[] = [...constantItems, ...tabSpecificItems];
 
   return (
     <div className="app-container">
-      {/* Background */}
-      <BackgroundSelector theme={preferences.backgroundTheme} />
+      {/* Animated background effect (device-local, off by default) */}
+      <BackgroundSelector />
 
       {/* Header */}
       <header className="app-header glass-header">
@@ -389,7 +375,7 @@ function MainAppLayout({
             </svg>
           </button>
         ) : (
-          <Dock items={dockItems} itemSize={42}>
+          <Dock items={constantItems} extras={tabSpecificItems} extrasKey={activeTab} itemSize={42}>
             {activeTab === 'planner' && (
               <>
                 <input
@@ -403,7 +389,7 @@ function MainAppLayout({
                     maxWidth: '200px',
                     width: '14vw',
                     padding: '8px 12px',
-                    borderRadius: '10px',
+                    borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-secondary)',
                     color: 'var(--text-primary)',
@@ -423,7 +409,7 @@ function MainAppLayout({
                   userSelect: 'none',
                   background: 'rgba(26, 26, 36, 0.6)',
                   padding: '0 12px',
-                  borderRadius: '10px',
+                  borderRadius: 'var(--radius-md)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   height: '42px', // Match Dock item size
                   transition: 'all 0.2s ease',
@@ -450,15 +436,16 @@ function MainAppLayout({
       <MobileMenu
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
-        items={dockItems.map(item => ({
+        items={menuItems.map(item => ({
           ...item,
           isActive: item.active
         }))}
       />
 
-      {/* Content */}
-      <main className="app-content">
-        {activeTab === 'timetable' && <Timetable />}
+      {/* Content — the timetable route is hard no-scroll (spec §2.1).
+          The wizard renders as a modal OVER the timetable, so both mount. */}
+      <main className={`app-content${activeTab === 'timetable' || activeTab === 'wizard' ? ' app-content--fixed' : ''}`}>
+        {(activeTab === 'timetable' || activeTab === 'wizard') && <Timetable onExportRef={timetableExportRef} />}
         {activeTab === 'planner' && (
           <Planner
             onSaveRef={plannerSaveRef}
@@ -470,6 +457,11 @@ function MainAppLayout({
             onIncludeCrossMajorChange={setIncludeCrossMajor}
           />
         )}
+        {activeTab === 'wizard' && (
+          <Suspense fallback={<div className="loading-container"><div className="spinner" /></div>}>
+            <PlannerWizard />
+          </Suspense>
+        )}
         {activeTab === 'settings' && <Settings onNavigateToPrivacy={() => setActiveTab('privacy')} />}
         {activeTab === 'privacy' && <PrivacyPolicy onBack={() => setActiveTab('settings')} />}
       </main>
@@ -478,7 +470,7 @@ function MainAppLayout({
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
       />
-    </div >
+    </div>
   );
 }
 

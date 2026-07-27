@@ -9,6 +9,7 @@ import {
     getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass,
     ClassData,
 } from '@unitimetable/shared';
+import { syncWidget } from '@/widget/widget-sync';
 
 export default function SettingsScreen() {
     const { selectedClass, setSelectedClass, setTimetableEntries } = useAppStore();
@@ -67,9 +68,10 @@ export default function SettingsScreen() {
             groupCode: classData.group_code || '',
         });
 
-        // Fetch timetable for the new class
+        // Fetch timetable for the new class (and refresh the widget)
         const entries = await fetchTimetableEntries(classData.id);
         setTimetableEntries(entries);
+        syncWidget(entries);
 
         setShowPicker(false);
         setSelectedFaculty(null);
@@ -212,7 +214,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0f0f23',
+        backgroundColor: '#12121a',
     },
     content: {
         flex: 1,
@@ -293,7 +295,7 @@ const styles = StyleSheet.create({
     },
     optionChipActive: {
         backgroundColor: 'rgba(129, 140, 248, 0.15)',
-        borderColor: '#818cf8',
+        borderColor: '#6366f1',
     },
     optionText: {
         fontSize: 14,

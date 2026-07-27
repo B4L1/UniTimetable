@@ -2,6 +2,10 @@
     "name": "@unitimetable/shared",
     "version": "1.0.0",
     "main": "index.ts",
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
     "types": "index.ts",
     "dependencies": {
         "@supabase/supabase-js": "^2.88.0",
@@ -9,10 +13,11 @@
         "tailwind-merge": "^2.2.1"
     },
     "peerDependencies": {
-        "react-native": "*",
-        "@react-native-async-storage/async-storage": "*"
+        "@react-native-async-storage/async-storage": "*",
+        "react-native": "*"
     },
     "devDependencies": {
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "vitest": "^4.1.10"
     }
 }

@@ -35,7 +35,7 @@
 
 .mobile-menu-header h2 {
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
 }
 
@@ -49,7 +49,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: all var(--transition);
 }
 
 .close-btn:hover {
@@ -70,12 +70,12 @@
     align-items: center;
     gap: 16px;
     padding: 16px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     background: transparent;
     border: none;
     cursor: pointer;
     text-align: left;
-    transition: all 0.2s ease;
+    transition: all var(--transition);
     width: 100%;
     color: var(--text-secondary);
 }
@@ -100,22 +100,22 @@
     margin-left: auto;
     width: 22px;
     height: 22px;
-    border-radius: 6px;
+    border-radius: var(--radius-xs);
     border: 2px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.2s var(--ease-bounce);
     background: rgba(255, 255, 255, 0.03);
 }
 
 .menu-toggle-checkbox.checked {
     background: var(--accent);
     border-color: var(--accent);
-    animation: scale-in 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: scale-in 0.2s var(--ease-bounce);
 }
 
-[data-theme='sapientia'] .menu-toggle-checkbox.checked {
+[data-theme='light'] .menu-toggle-checkbox.checked {
     background: var(--sap-green);
     border-color: var(--sap-green);
 }
@@ -150,17 +150,17 @@
 }
 
 /* Specific theme overrides */
-[data-theme='sapientia'] .mobile-menu-item.active {
+[data-theme='light'] .mobile-menu-item.active {
     background: var(--sap-green);
     box-shadow: 0 4px 12px rgba(10, 108, 66, 0.3);
 }
 
-[data-theme='faulty-terminal'] .mobile-menu-drawer {
+[data-theme='terminal'] .mobile-menu-drawer {
     background: var(--bg-primary);
     border-left: 1px solid var(--text-primary);
 }
 
-[data-theme='faulty-terminal'] .mobile-menu-item.active {
+[data-theme='terminal'] .mobile-menu-item.active {
     background: var(--text-primary);
     color: var(--bg-primary);
 }
