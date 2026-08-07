@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/appStore';
 import { supabase, fetchTimetableEntriesForFacultyYear, AvailableClassEntry, TimetableEntry } from '@unitimetable/shared';
+import { palette, radius, fonts } from '@/constants/theme';
 
 const DAYS = ['Hé', 'Ke', 'Sz', 'Cs', 'Pé'];
 
@@ -186,7 +187,7 @@ export default function PlannerScreen() {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.emptyContainer}>
-                    <ActivityIndicator size="large" color="#818cf8" />
+                    <ActivityIndicator size="large" color={palette.accent} />
                     <Text style={[styles.emptySubtitle, { marginTop: 16 }]}>
                         Adatok betöltése...
                     </Text>
@@ -230,16 +231,16 @@ export default function PlannerScreen() {
                                     key={dayIndex}
                                     style={[
                                         styles.cell,
-                                        selected && {
-                                            backgroundColor: `${selected.color || '#818cf8'}22`,
-                                            borderColor: selected.color || '#818cf8',
-                                        },
+                                        selected && styles.cellSelected,
                                         !selected && hasOptions && styles.cellAvailable,
                                     ]}
                                     onPress={() => handleSlotPress(dayIndex, slotIndex)}
                                     disabled={!hasOptions}
                                     activeOpacity={0.7}
                                 >
+                                    {selected && (
+                                        <View style={[styles.cellBar, { backgroundColor: selected.color || palette.accent }]} />
+                                    )}
                                     {selected ? (
                                         <>
                                             <Text style={styles.cellText} numberOfLines={2}>
@@ -289,7 +290,7 @@ export default function PlannerScreen() {
                                                 style={[
                                                     styles.optionCard,
                                                     isSelected && styles.optionCardActive,
-                                                    { borderLeftColor: entry.color || '#818cf8' },
+                                                    { borderLeftColor: entry.color || palette.accent },
                                                 ]}
                                                 onPress={() => handleSelect(entry)}
                                             >
@@ -343,12 +344,12 @@ const CELL_SIZE = 56;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#12121a',
+        backgroundColor: palette.bgApp,
     },
     title: {
         fontSize: 28,
-        fontWeight: '700',
-        color: '#ffffff',
+        fontFamily: fonts.sansBold,
+        color: palette.textPrimary,
         paddingHorizontal: 20,
         paddingTop: 12,
         paddingBottom: 12,
@@ -372,8 +373,8 @@ const styles = StyleSheet.create({
     },
     timeText: {
         fontSize: 11,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.4)',
+        fontFamily: fonts.monoMedium,
+        color: palette.textTertiary,
     },
     dayHeader: {
         flex: 1,
@@ -383,40 +384,53 @@ const styles = StyleSheet.create({
     },
     dayHeaderText: {
         fontSize: 13,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.6)',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textSecondary,
     },
     cell: {
         flex: 1,
         height: CELL_SIZE,
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: 8,
+        backgroundColor: palette.bgSurface,
+        borderRadius: radius.sm,
         marginHorizontal: 1.5,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 3,
         borderWidth: 1,
         borderColor: 'transparent',
+        overflow: 'hidden',
+    },
+    cellSelected: {
+        backgroundColor: palette.bgElevated,
+        borderColor: palette.borderDefault,
     },
     cellAvailable: {
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: palette.borderSubtle,
         borderStyle: 'dashed',
+    },
+    cellBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
     },
     cellText: {
         fontSize: 9,
-        fontWeight: '600',
-        color: '#ffffff',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textPrimary,
         textAlign: 'center',
     },
     cellSub: {
         fontSize: 8,
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontFamily: fonts.mono,
+        color: palette.textSecondary,
         textAlign: 'center',
         marginTop: 1,
     },
     cellPlus: {
         fontSize: 18,
-        color: 'rgba(255, 255, 255, 0.2)',
+        color: palette.textTertiary,
     },
     // Modal
     modalOverlay: {
@@ -425,9 +439,11 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#1a1a24',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        backgroundColor: palette.bgElevated,
+        borderTopLeftRadius: radius.md,
+        borderTopRightRadius: radius.md,
+        borderWidth: 1,
+        borderColor: palette.borderDefault,
         paddingHorizontal: 20,
         paddingBottom: 40,
         maxHeight: '70%',
@@ -435,42 +451,46 @@ const styles = StyleSheet.create({
     modalHandle: {
         width: 36,
         height: 4,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 2,
+        backgroundColor: palette.borderStrong,
+        borderRadius: radius.pill,
         alignSelf: 'center',
         marginTop: 12,
         marginBottom: 16,
     },
     modalTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#ffffff',
+        fontFamily: fonts.sansBold,
+        color: palette.textPrimary,
         marginBottom: 16,
     },
     modalScroll: {
         maxHeight: 400,
     },
     optionCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 12,
+        backgroundColor: palette.bgSurface,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: palette.borderSubtle,
         padding: 14,
         marginBottom: 8,
-        borderLeftWidth: 4,
+        borderLeftWidth: 3,
         flexDirection: 'row',
         alignItems: 'center',
     },
     optionCardActive: {
-        backgroundColor: 'rgba(129, 140, 248, 0.12)',
+        backgroundColor: palette.accentSubtle,
+        borderColor: palette.accentLine,
     },
     optionName: {
         fontSize: 15,
-        fontWeight: '600',
-        color: '#ffffff',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textPrimary,
         marginBottom: 3,
     },
     optionTeacher: {
         fontSize: 13,
-        color: 'rgba(255, 255, 255, 0.6)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
         marginBottom: 4,
     },
     optionMeta: {
@@ -479,30 +499,32 @@ const styles = StyleSheet.create({
     },
     optionRoom: {
         fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.4)',
+        fontFamily: fonts.mono,
+        color: palette.textTertiary,
     },
     optionGroup: {
         fontSize: 11,
-        color: '#818cf8',
-        fontWeight: '600',
+        fontFamily: fonts.monoMedium,
+        color: palette.accent,
     },
     checkmark: {
         fontSize: 20,
-        color: '#818cf8',
-        fontWeight: '700',
+        color: palette.accent,
+        fontFamily: fonts.sansBold,
         marginLeft: 8,
     },
     clearButton: {
         paddingVertical: 14,
         alignItems: 'center',
         marginTop: 4,
-        borderRadius: 12,
+        borderRadius: radius.md,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: palette.borderDefault,
     },
     clearButtonText: {
         fontSize: 15,
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
     },
     // Empty state
     emptyContainer: {
@@ -517,13 +539,14 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 24,
-        fontWeight: '600',
-        color: '#ffffff',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textPrimary,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.6)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
         textAlign: 'center',
     },
 });
