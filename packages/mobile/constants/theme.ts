@@ -1,38 +1,42 @@
-// Design tokens — mirrors packages/web/src/index.css so the mobile app
-// looks identical to the web app. Keep the two in sync.
+// Design tokens — mirrors packages/web/src/index.css (Blueprint v4) so the
+// mobile app matches the web app exactly. Keep the two in sync.
 
 export const palette = {
-    // Colors — dark theme (matches web :root)
-    bgPrimary: '#12121a',
-    bgSecondary: '#181824',
-    bgCard: '#1a1a24',
-    bgTertiary: '#222230',
-    textPrimary: '#ffffff',
-    textSecondary: '#a0a0b0',
-    accent: '#6366f1',
-    accentHover: '#818cf8',
-    border: 'rgba(255, 255, 255, 0.1)',
-    borderStrong: 'rgba(255, 255, 255, 0.15)',
-    error: '#ef4444',
-    success: '#22c55e',
+    // Surfaces — opaque, stepped by value (dark only; mobile has no light theme yet)
+    bgApp: '#08090a',
+    bgSurface: '#0c0e10',
+    bgElevated: '#131619',
+    bgInset: '#050506',
 
-    // Glass (RN has no backdrop blur on plain Views — use the solid tint)
-    glassBg: 'rgba(20, 20, 28, 0.8)',
-    glassBorder: 'rgba(255, 255, 255, 0.12)',
+    // Hairlines — opaque, not alpha
+    borderSubtle: '#1c1f23',
+    borderDefault: '#26292e',
+    borderStrong: '#383c43',
+    gridLine: '#16181b',
 
-    // Week parity chips (matches web .week-indicator-chip)
-    weekOdd: '#6366f1',
-    weekOddText: '#a5b4fc',
-    weekEven: '#a855f7',
-    weekEvenText: '#d8b4fe',
+    // Text
+    textPrimary: '#edeef0',
+    textSecondary: '#969ba3',
+    textTertiary: '#5f646c',
+
+    // Accent — Sapientia green
+    accent: '#3fbb7d',
+    accentHover: '#5ed296',
+    accentSubtle: 'rgba(63, 187, 125, 0.12)',
+    accentLine: 'rgba(63, 187, 125, 0.4)',
+
+    // Status
+    danger: '#e5534b',
+    warning: '#d99a2b',
+    success: '#3fbb7d',
 } as const;
 
-// Radius scale — identical to web --radius-* tokens
+// Radius — one value. All names resolve to 2px, matching web's --radius-* tokens.
 export const radius = {
-    xs: 6,
-    sm: 8,
-    md: 12,
-    lg: 16,
+    xs: 2,
+    sm: 2,
+    md: 2,
+    lg: 2,
     pill: 999,
 } as const;
 
@@ -42,6 +46,17 @@ export const spacing = {
     md: 12,
     lg: 16,
     xl: 24,
+} as const;
+
+// Loaded via @expo-google-fonts in app/_layout.tsx — see useFonts() there.
+export const fonts = {
+    sans: 'Outfit_400Regular',
+    sansMedium: 'Outfit_500Medium',
+    sansSemiBold: 'Outfit_600SemiBold',
+    sansBold: 'Outfit_700Bold',
+    mono: 'JetBrainsMono_400Regular',
+    monoMedium: 'JetBrainsMono_500Medium',
+    monoBold: 'JetBrainsMono_700Bold',
 } as const;
 
 export type Palette = typeof palette;
