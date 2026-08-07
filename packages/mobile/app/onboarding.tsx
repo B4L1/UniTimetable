@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppStore } from '@/stores/appStore';
-import Colors from '@/constants/Colors';
+import { palette, radius, fonts } from '@/constants/theme';
 import { AnimatedStep } from '../components/AnimatedStep';
 import {
     fetchClasses,
@@ -20,9 +18,8 @@ import {
 const { width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
-    const { t } = useTranslation();
     const router = useRouter();
-    const { setSelectedClass, setFirstLaunchComplete, preferences } = useAppStore();
+    const { setSelectedClass, setFirstLaunchComplete } = useAppStore();
 
     const [classes, setClasses] = useState<ClassData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,9 +30,6 @@ export default function OnboardingScreen() {
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
     const scrollViewRef = useRef<ScrollView>(null);
-
-    const isDark = preferences.theme === 'dark';
-    const colors = isDark ? Colors.dark : Colors.light;
 
     // Fetch classes on mount
     useEffect(() => {
@@ -111,7 +105,7 @@ export default function OnboardingScreen() {
         return (
             <View style={[styles.container, styles.centered]}>
                 <StatusBar style="light" />
-                <ActivityIndicator size="large" color="#818cf8" />
+                <ActivityIndicator size="large" color={palette.accent} />
                 <Text style={styles.loadingText}>Adatok betöltése...</Text>
             </View>
         );
@@ -161,15 +155,12 @@ export default function OnboardingScreen() {
                                 onPress={() => handleSelectFaculty(faculty)}
                                 activeOpacity={0.7}
                             >
-                                <LinearGradient
-                                    colors={selectedFaculty === faculty ? ['#6366f1', '#4f46e5'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
-                                    style={styles.cardGradient}
-                                >
+                                <View style={styles.cardInner}>
                                     <Text style={[
                                         styles.cardText,
                                         selectedFaculty === faculty && styles.cardTextSelected
                                     ]}>{faculty}</Text>
-                                </LinearGradient>
+                                </View>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -191,10 +182,7 @@ export default function OnboardingScreen() {
                                         onPress={() => handleSelectYear(year)}
                                         activeOpacity={0.7}
                                     >
-                                        <LinearGradient
-                                            colors={selectedYear === year ? ['#8b5cf6', '#7c3aed'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
-                                            style={styles.cardGradient}
-                                        >
+                                        <View style={styles.cardInner}>
                                             <Text style={[
                                                 styles.yearText,
                                                 selectedYear === year && styles.cardTextSelected
@@ -203,7 +191,7 @@ export default function OnboardingScreen() {
                                                 styles.yearLabel,
                                                 selectedYear === year && styles.cardTextSelected
                                             ]}>évfolyam</Text>
-                                        </LinearGradient>
+                                        </View>
                                     </TouchableOpacity>
                                 ))}
                             </View>
@@ -227,15 +215,12 @@ export default function OnboardingScreen() {
                                         onPress={() => handleSelectGroup(group)}
                                         activeOpacity={0.7}
                                     >
-                                        <LinearGradient
-                                            colors={selectedGroup === group ? ['#ec4899', '#db2777'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
-                                            style={styles.cardGradient}
-                                        >
+                                        <View style={styles.cardInner}>
                                             <Text style={[
                                                 styles.groupText,
                                                 selectedGroup === group && styles.cardTextSelected
                                             ]}>{group}</Text>
-                                        </LinearGradient>
+                                        </View>
                                     </TouchableOpacity>
                                 ))}
                             </View>
@@ -253,38 +238,40 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#12121a',
+        backgroundColor: palette.bgApp,
     },
     centered: {
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#12121a',
+        backgroundColor: palette.bgApp,
     },
     loadingText: {
-        color: 'rgba(255,255,255,0.7)',
+        color: palette.textSecondary,
         marginTop: 16,
         fontSize: 16,
+        fontFamily: fonts.sans,
     },
     errorEmoji: {
         fontSize: 48,
         marginBottom: 16,
     },
     errorText: {
-        color: '#ef4444',
+        color: palette.danger,
         fontSize: 16,
         textAlign: 'center',
         marginBottom: 24,
         paddingHorizontal: 32,
+        fontFamily: fonts.sans,
     },
     retryButton: {
-        backgroundColor: '#818cf8',
+        backgroundColor: palette.accent,
         paddingHorizontal: 24,
         paddingVertical: 12,
-        borderRadius: 12,
+        borderRadius: radius.md,
     },
     retryButtonText: {
-        color: '#fff',
-        fontWeight: '600',
+        color: palette.bgApp,
+        fontFamily: fonts.sansSemiBold,
         fontSize: 16,
     },
     scrollContent: {
@@ -301,13 +288,14 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 32,
-        fontWeight: 'bold',
-        color: '#fff',
+        fontFamily: fonts.sansBold,
+        color: palette.textPrimary,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 18,
-        color: 'rgba(255,255,255,0.6)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
         textAlign: 'center',
     },
     sectionContainer: {
@@ -315,8 +303,8 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 14,
-        fontWeight: '600',
-        color: 'rgba(255,255,255,0.4)',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textTertiary,
         textTransform: 'uppercase',
         letterSpacing: 1,
         marginBottom: 12,
@@ -331,53 +319,55 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     card: {
-        width: '48%', // Approx half width
+        width: '48%',
         aspectRatio: 1.5,
-        borderRadius: 16,
+        borderRadius: radius.md,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: palette.borderDefault,
     },
     yearCard: {
         flex: 1,
         aspectRatio: 1,
-        borderRadius: 16, // Circle-ish
+        borderRadius: radius.md,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: palette.borderDefault,
     },
-    cardGradient: {
+    cardInner: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         padding: 12,
+        backgroundColor: palette.bgElevated,
     },
     cardSelected: {
-        borderColor: 'transparent',
-        transform: [{ scale: 1.02 }],
+        borderColor: palette.accent,
+        borderLeftWidth: 2,
     },
     cardText: {
         fontSize: 16,
-        fontWeight: '600',
-        color: 'rgba(255,255,255,0.8)',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textSecondary,
         textAlign: 'center',
     },
     yearText: {
         fontSize: 32,
-        fontWeight: 'bold',
-        color: 'rgba(255,255,255,0.8)',
+        fontFamily: fonts.sansBold,
+        color: palette.textSecondary,
     },
     yearLabel: {
         fontSize: 12,
-        color: 'rgba(255,255,255,0.5)',
+        fontFamily: fonts.sans,
+        color: palette.textTertiary,
         marginTop: 4,
     },
     groupText: {
         fontSize: 20,
-        fontWeight: 'bold',
-        color: 'rgba(255,255,255,0.8)',
+        fontFamily: fonts.sansBold,
+        color: palette.textSecondary,
     },
     cardTextSelected: {
-        color: '#fff',
+        color: palette.accent,
     },
 });
