@@ -10,6 +10,7 @@ import {
     ClassData,
 } from '@unitimetable/shared';
 import { syncWidget } from '@/widget/widget-sync';
+import { palette, radius, fonts } from '@/constants/theme';
 
 export default function SettingsScreen() {
     const { selectedClass, setSelectedClass, setTimetableEntries } = useAppStore();
@@ -107,7 +108,7 @@ export default function SettingsScreen() {
                 {showPicker && (
                     <View style={styles.pickerContainer}>
                         {loading ? (
-                            <ActivityIndicator size="small" color="#818cf8" style={{ padding: 24 }} />
+                            <ActivityIndicator size="small" color={palette.accent} style={{ padding: 24 }} />
                         ) : (
                             <>
                                 {/* Faculty */}
@@ -214,7 +215,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#12121a',
+        backgroundColor: palette.bgApp,
     },
     content: {
         flex: 1,
@@ -222,8 +223,8 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 28,
-        fontWeight: '700',
-        color: '#ffffff',
+        fontFamily: fonts.sansBold,
+        color: palette.textPrimary,
         marginBottom: 24,
     },
     section: {
@@ -231,48 +232,49 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 12,
-        fontWeight: '700',
-        color: 'rgba(255, 255, 255, 0.4)',
+        fontFamily: fonts.sansBold,
+        color: palette.textTertiary,
         letterSpacing: 1.5,
         marginBottom: 12,
     },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 14,
+        backgroundColor: palette.bgSurface,
+        borderRadius: radius.md,
         padding: 16,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: palette.borderDefault,
     },
     cardLabel: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
     },
     cardValue: {
         fontSize: 17,
-        fontWeight: '600',
-        color: '#ffffff',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textPrimary,
         marginTop: 4,
     },
     cardArrow: {
         fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.3)',
+        color: palette.textTertiary,
     },
     // Picker
     pickerContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
-        borderRadius: 14,
+        backgroundColor: palette.bgSurface,
+        borderRadius: radius.md,
         padding: 16,
         marginBottom: 28,
         borderWidth: 1,
-        borderColor: 'rgba(129, 140, 248, 0.2)',
+        borderColor: palette.borderDefault,
     },
     pickerLabel: {
         fontSize: 13,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textSecondary,
         marginBottom: 10,
         marginTop: 16,
     },
@@ -286,76 +288,82 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     optionChip: {
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 10,
+        backgroundColor: palette.bgElevated,
+        borderRadius: radius.sm,
         paddingVertical: 10,
         paddingHorizontal: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: palette.borderDefault,
+        borderLeftWidth: 1,
     },
     optionChipActive: {
-        backgroundColor: 'rgba(129, 140, 248, 0.15)',
-        borderColor: '#6366f1',
+        borderLeftWidth: 2,
+        borderLeftColor: palette.accent,
     },
     optionText: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.7)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
     },
     optionTextActive: {
-        color: '#818cf8',
-        fontWeight: '600',
+        color: palette.accent,
+        fontFamily: fonts.sansSemiBold,
     },
     yearChip: {
         flex: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 10,
+        backgroundColor: palette.bgElevated,
+        borderRadius: radius.sm,
         paddingVertical: 14,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: palette.borderDefault,
+        borderLeftWidth: 1,
     },
     yearText: {
         fontSize: 16,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.7)',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textSecondary,
     },
     groupChip: {
         flex: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 10,
+        backgroundColor: palette.bgElevated,
+        borderRadius: radius.sm,
         paddingVertical: 16,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: palette.borderDefault,
+        borderLeftWidth: 1,
     },
     groupText: {
         fontSize: 20,
-        fontWeight: 'bold',
-        color: 'rgba(255, 255, 255, 0.7)',
+        fontFamily: fonts.sansBold,
+        color: palette.textSecondary,
     },
     // About
     aboutCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 14,
+        backgroundColor: palette.bgSurface,
+        borderRadius: radius.md,
         padding: 24,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: palette.borderDefault,
     },
     aboutTitle: {
         fontSize: 20,
-        fontWeight: '700',
-        color: '#ffffff',
+        fontFamily: fonts.sansBold,
+        color: palette.textPrimary,
         marginBottom: 4,
     },
     aboutVersion: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.4)',
+        fontFamily: fonts.mono,
+        color: palette.textTertiary,
         marginBottom: 12,
     },
     aboutDescription: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.6)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
         textAlign: 'center',
         lineHeight: 20,
     },
