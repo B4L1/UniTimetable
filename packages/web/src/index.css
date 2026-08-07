@@ -2,41 +2,73 @@
 @import "./themes/sapientia.css";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS (spec v3, B9/B10)
+   DESIGN TOKENS — "Blueprint" (v4)
 
-   Components consume ONLY semantic tokens. A color theme is a token map:
+   Design language, in one paragraph:
+   Structure is drawn with 1px hairlines, never with blur or shadow. Corners
+   are 2px — square at a glance, but not brutal where a hundred rectangles
+   tile against each other in the grid. Surfaces are opaque and step in
+   value (app → surface → elevated); elevation reads from border contrast,
+   not from a drop shadow. Colour is rationed: the UI chrome is neutral, and
+   saturation is spent almost entirely on the subject accent bars, so the
+   timetable is the only thing on screen that is colourful. Metadata (times,
+   rooms, codes) is set in mono; prose is set in Inter.
+
+   Components consume ONLY semantic tokens. A theme is a token map:
      :root                    dark (base values)
      [data-theme='light']     Sapientia light (themes/sapientia.css)
      [data-theme='dark']      = :root
-     [data-theme='dark-glass'] dark + translucent surfaces
      [data-theme='terminal']  easter egg
-   Seasonal themes (christmas, easter, …) = one more token block, nothing else.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Semantic colors — dark theme base (spec §4.1) */
-  --bg-app: #020617;
-  --bg-surface: #0f172a;
-  --bg-elevated: #1e293b;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --grid-line: rgba(255, 255, 255, 0.05);
-  --text-primary: #f1f5f9;
-  --text-secondary: #a7b4c6;
-  --text-tertiary: #76839a;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-subtle: rgba(99, 102, 241, 0.16);
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --success: #22c55e;
+  /* Surfaces — near-black with a cool cast, stepped by value.
+     Deliberately NOT slate-navy (#0f172a et al): that Tailwind ramp is the
+     single most recognisable "generated dashboard" tell. */
+  --bg-app:       #08090a;
+  --bg-surface:   #0c0e10;
+  --bg-elevated:  #131619;
+  --bg-inset:     #050506;   /* wells: grid gutters, inputs, code */
+  --bg-hover:     rgba(255, 255, 255, 0.035);
+  --bg-active:    rgba(255, 255, 255, 0.06);
 
-  /* Glass tokens — used by modals everywhere, and by surfaces only in
-     the dark-glass theme */
-  --glass-bg: rgba(15, 23, 42, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  /* Grid's own inside fill, behind empty timetable/planner slots. Dark theme
+     never needed this split from --bg-app — light theme's sapientia.css
+     overrides it separately (see --grid-fill there). */
+  --grid-fill: var(--bg-surface);
 
-  /* Spacing scale (spec §3.1 — no arbitrary values) */
+  /* Hairlines carry all structure. Opaque, not alpha — alpha borders shift
+     against every different surface they sit on and never quite line up. */
+  --border-subtle: #1c1f23;
+  --border-default:#26292e;
+  --border-strong: #383c43;
+  --grid-line:     #16181b;
+
+  --text-primary:   #edeef0;
+  --text-secondary: #969ba3;
+  --text-tertiary:  #5f646c;
+
+  /* Accent: Sapientia green, lifted for dark backgrounds. Ties the dark and
+     light themes to one brand rather than the default indigo. */
+  --accent:        #3fbb7d;
+  --accent-hover:  #5ed296;
+  --accent-subtle: rgba(63, 187, 125, 0.12);
+  --accent-line:   rgba(63, 187, 125, 0.4);
+  --on-accent:     #06120c;
+
+  --danger:  #e5534b;
+  --warning: #d99a2b;
+  --success: #3fbb7d;
+
+  /* Card system — subject colour lives in the top bar only; the fill stays
+     neutral so every one of the 16 palette colours reads at the same
+     legibility. See ClassCard.css. */
+  --card-bg:        var(--bg-elevated);
+  --card-bg-hover:  #191d21;
+  --card-border:    var(--border-default);
+  --card-accent-h:  5px;
+  --card-accent-dim: 0.22;  /* opacity of the "off" half on split weeks */
+
+  /* Spacing scale */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -44,24 +76,37 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  /* Radius scale (spec §3.2) */
-  --radius-xs:   6px;
-  --radius-sm:   8px;
-  --radius-md:  12px;
-  --radius-lg:  16px;
+  /* Radius — one value. The names survive so component CSS keeps resolving;
+     they all land on the same hairline corner. --radius-pill stays round for
+     the few things that are genuinely circular (avatars, dots, toggles). */
+  --radius-xs:   2px;
+  --radius-sm:   2px;
+  --radius-md:   2px;
+  --radius-lg:   2px;
+  --radius-none: 0;
   --radius-pill: 9999px;
 
-  /* Shadow scale — elevation only (borders define structure, B10.2) */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.14), 0 1px 2px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 14px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.10);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.30), 0 4px 10px rgba(0,0,0,0.12);
-  --shadow-xl: 0 24px 56px rgba(0,0,0,0.40), 0 8px 20px rgba(0,0,0,0.14);
+  /* Elevation. Content surfaces get NO shadow — borders do that job. Shadows
+     exist only for things that genuinely float above the page. */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.7);
 
-  /* Motion (B10.6: 120–200ms, springs only for spatial moves) */
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Motion. Flat UI has no depth to hide sloppy timing behind, so durations
+     are short and the curve is decisive. anime.js mirrors these in
+     src/motion/tokens.ts — change both together. */
+  --ease:        cubic-bezier(0.2, 0, 0, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast:    120ms;
+  --dur-base:    180ms;
+  --dur-slow:    280ms;
+  --transition:  180ms cubic-bezier(0.2, 0, 0, 1);
 
+  /* Type */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 }
 
 /* ── Legacy aliases ─────────────────────────────────────────────────────
@@ -84,24 +129,35 @@
   --bg-alt: var(--bg-hover);
   --border: var(--border-subtle);
   --error: var(--danger);
+
+  /* The frosted look is gone. These two names are still referenced by modal
+     CSS; they now resolve to opaque surfaces so nothing blurs. Delete the
+     aliases once the last .glass-* class name is renamed. */
+  --glass-bg: var(--bg-elevated);
+  --glass-border: var(--border-default);
 }
 
-/* Dark-glass: dark tokens with translucent surfaces (frosted look, opt-in) */
+/* dark-glass was the opt-in frosted theme. It is retired — anything still
+   persisted in a user's localStorage lands on plain dark instead of an
+   unstyled page. See utils/theme.ts, which migrates the stored value. */
 [data-theme='dark-glass'],
 body[data-theme='dark-glass'] {
-  --bg-surface: rgba(15, 23, 42, 0.72);
-  --bg-elevated: rgba(30, 41, 59, 0.8);
+  --bg-surface: #0c0e10;
+  --bg-elevated: #131619;
 }
 
 /* Terminal (easter egg) */
 [data-theme='terminal'],
 body[data-theme='terminal'] {
   --bg-app: #050505;
-  --bg-surface: #0d1a0d;
-  --bg-elevated: #102010;
+  --bg-surface: #0a140a;
+  --bg-elevated: #0d1c0d;
+  --bg-inset: #030603;
   --bg-hover: rgba(0, 255, 65, 0.08);
-  --border-subtle: rgba(0, 255, 65, 0.2);
-  --border-strong: rgba(0, 255, 65, 0.4);
+  --bg-active: rgba(0, 255, 65, 0.14);
+  --border-subtle: rgba(0, 255, 65, 0.18);
+  --border-default: rgba(0, 255, 65, 0.28);
+  --border-strong: rgba(0, 255, 65, 0.45);
   --grid-line: rgba(0, 255, 65, 0.08);
   --text-primary: #00ff41;
   --text-secondary: #00c832;
@@ -109,20 +165,26 @@ body[data-theme='terminal'] {
   --accent: #00ff41;
   --accent-hover: #00ff7f;
   --accent-subtle: rgba(0, 255, 65, 0.12);
+  --accent-line: rgba(0, 255, 65, 0.5);
+  --on-accent: #001a05;
   --success: #00ff41;
   --danger: #ff0000;
 
-  --glass-bg: rgba(0, 40, 0, 0.75);
-  --glass-border: rgba(0, 255, 65, 0.4);
+  --glass-bg: #0d1c0d;
+  --glass-border: rgba(0, 255, 65, 0.28);
 
-  /* Card coloring: terminal renders everything monochrome green */
-  --card-bg-override: rgba(0, 59, 0, 0.5);
-  --card-border-override: rgba(0, 255, 65, 0.3);
+  /* Terminal renders everything monochrome green, accent bars included */
+  --card-bg: #0a1a0a;
+  --card-bg-hover: #0f240f;
+  --card-border: rgba(0, 255, 65, 0.3);
   --subject-color: #00ff41 !important;
 }
 
+/* The dock's active tab is a tinted cell with an accent rail now, not a solid
+   accent fill — so the terminal theme no longer needs to flip the label to the
+   background colour to stay readable on top of it. */
 body[data-theme='terminal'] .dock-item.active {
-  color: var(--bg-app) !important;
+  color: var(--accent);
 }
 
 * {
@@ -139,11 +201,14 @@ body,
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Inter's default figures are proportional; the app is full of numbers. */
+  font-feature-settings: 'cv05' 1, 'ss01' 1;
   /* Smooth theme crossfade for properties that aren't handled by view-transition */
   transition: background-color 0.45s var(--ease), color 0.35s var(--ease);
 }
@@ -181,41 +246,103 @@ body[data-theme='terminal'] * {
 }
 
 /* ── Surface utilities ─────────────────────────────────────────────────
-   Spec §5: content surfaces are SOLID (background + subtle border + soft
-   shadow). Blur/translucency is reserved for the opt-in dark-glass theme;
-   the class names keep their historical "glass-" prefix until the Phase 1
-   component sweep renames them. */
-.glass {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-}
+   Every surface in the app is one of three things: a panel (flush with the
+   page, hairline border), a well (recessed, for inputs and grid gutters),
+   or an overlay (the only thing allowed a shadow).
 
+   `.panel` / `.well` / `.overlay` are canonical. `.glass`, `.glass-card` and
+   `.glass-header` are kept as aliases so the ~20 existing call sites keep
+   working through the component sweep — they no longer blur anything. */
+.panel,
+.glass,
 .glass-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-sm);
 }
 
+.panel--raised {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+}
+
+.well {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+/* The one place elevation is real: things that float over the page. */
+.overlay {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+.panel-header,
 .glass-header {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-/* dark-glass theme: the frosted look users can opt into */
-body[data-theme='dark-glass'] .glass,
-body[data-theme='dark-glass'] .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-color: var(--glass-border);
+/* ── Blueprint detailing ───────────────────────────────────────────────
+   Two motifs borrowed from technical drawing, used sparingly:
+   `.ruled` puts a faint measured grid behind a region, and `.ticked` marks
+   a panel's corners with crosshairs instead of rounding them. */
+.ruled {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
 }
 
-body[data-theme='dark-glass'] .glass-header {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom-color: var(--glass-border);
+.ticked { position: relative; }
+
+.ticked::before,
+.ticked::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-color: var(--border-strong);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.ticked::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.ticked::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+/* ── Mono metadata ─────────────────────────────────────────────────────
+   Times, room codes and group codes are data, not prose. Setting them in
+   mono with tabular figures makes columns of times line up on the digit and
+   is most of what separates this from a generic card layout. */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Section labels: small, uppercase, tracked out, with the trailing rule that
+   runs to the edge of the container. */
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.eyebrow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
 /* App Layout */
@@ -256,24 +383,31 @@ body[data-theme='dark-glass'] .glass-header {
   white-space: nowrap;
 }
 
+/* Header badges are metadata tags, not pills: square, mono, tabular. The
+   pill shape was the only rounded thing left in the header. */
 .class-badge {
   color: var(--text-secondary);
-  font-size: 0.875rem;
-  padding: 4px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  padding: 3px 8px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
 
 .count-badge {
-  color: #6366f1;
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 4px 12px;
-  background: rgba(99, 102, 241, 0.1);
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 3px 8px;
+  background: var(--accent-subtle);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--accent-line);
   white-space: nowrap;
 }
 
@@ -321,11 +455,12 @@ body[data-theme='dark-glass'] .glass-header {
 .week-indicator-chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 5px 2px 4px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.05);
+  gap: 4px;
+  padding: 2px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+  font-family: var(--font-mono);
   font-size: 0.55rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -341,27 +476,34 @@ body[data-theme='dark-glass'] .glass-header {
   min-width: 0;
 }
 
+/* A square tick, matching the accent bars — the app has no other dots. */
 .week-indicator-dot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: 0;
   flex-shrink: 0;
 }
 
-.week-indicator-chip[data-week='odd']   { border-color: rgba(99,102,241,0.35); background: rgba(99,102,241,0.1); color: #a5b4fc; }
-.week-indicator-chip[data-week='odd']   .week-indicator-dot { background: #6366f1; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
+/* Parity uses the SAME left/right-half language as the card accent bars, so
+   "odd = leading half, even = trailing half" is learned once and applies
+   everywhere. No glows: they were the only bloom left in the UI. */
+.week-indicator-chip[data-week='odd'],
+.week-indicator-chip[data-week='even'] { border-color: var(--accent-line); background: var(--accent-subtle); color: var(--accent); }
 
-.week-indicator-chip[data-week='even']  { border-color: rgba(168,85,247,0.35); background: rgba(168,85,247,0.1); color: #d8b4fe; }
-.week-indicator-chip[data-week='even']  .week-indicator-dot { background: #a855f7; box-shadow: 0 0 6px rgba(168,85,247,0.6); }
+.week-indicator-chip[data-week='odd']  .week-indicator-dot {
+  background: linear-gradient(90deg, var(--accent) 0 50%, var(--border-subtle) 50% 100%);
+}
+.week-indicator-chip[data-week='even'] .week-indicator-dot {
+  background: linear-gradient(90deg, var(--border-subtle) 0 50%, var(--accent) 50% 100%);
+}
 
-.week-indicator-chip[data-week='break'] { border-color: rgba(234,179,8,0.3); background: rgba(234,179,8,0.08); color: #fde68a; }
-.week-indicator-chip[data-week='break'] .week-indicator-dot { background: #eab308; }
+.week-indicator-chip[data-week='break'] { border-color: var(--border-default); background: var(--bg-inset); color: var(--text-tertiary); }
+.week-indicator-chip[data-week='break'] .week-indicator-dot { background: var(--text-tertiary); }
 
 /* Sapientia light-mode overrides */
-body[data-theme='light'] .week-indicator-chip[data-week='odd']  { border-color: rgba(10,108,66,0.3); background: rgba(10,108,66,0.08); color: var(--sap-green); }
-body[data-theme='light'] .week-indicator-chip[data-week='odd']  .week-indicator-dot { background: var(--sap-green); box-shadow: 0 0 6px rgba(10,108,66,0.4); }
-body[data-theme='light'] .week-indicator-chip[data-week='even'] { border-color: rgba(0,84,166,0.3); background: rgba(0,84,166,0.08); color: var(--sap-blue); }
-body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-dot { background: var(--sap-blue); box-shadow: 0 0 6px rgba(0,84,166,0.4); }
+/* The light theme needs no chip overrides any more — the rules above are
+   written entirely in --accent/--border tokens, which the Sapientia theme
+   already remaps to its green. */
 
 .day-header {
   padding: 12px 16px;
@@ -499,48 +641,110 @@ body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-
   margin-bottom: 24px;
 }
 
+/* Section headings use the same mono eyebrow as the rest of the app, with the
+   rule running out to the edge of the column. */
 .settings-section h2 {
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-secondary);
-  margin-bottom: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+
+.settings-section h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
 .settings-card {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  gap: var(--space-4);
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: background var(--transition);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .settings-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-hover);
 }
 
 .settings-row:last-child {
   border-bottom: none;
 }
 
+/* Rows that open a section below them get a top rule instead of relying on
+   the previous row's bottom border, which the dropdown interrupts. */
+.settings-row--bordered {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-row--static {
+  cursor: default;
+}
+
+.settings-row--static:hover {
+  background: transparent;
+}
+
+.settings-row--version {
+  cursor: pointer;
+  user-select: none;
+}
+
 .settings-label {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.settings-label-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-label-hint {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--text-tertiary);
 }
 
 .settings-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
   color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.settings-value.is-warning {
+  color: var(--warning);
+}
+
+.settings-caret {
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
 }
 
 /* Dropdown */
@@ -549,26 +753,65 @@ body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-
 }
 
 .dropdown-content {
-  padding: 8px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 4px 0;
+  background: var(--bg-inset);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.dropdown-content--form {
+  padding: 16px;
 }
 
 .dropdown-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  padding-left: 44px;
+  padding: 10px 16px 10px 44px;
   cursor: pointer;
-  transition: background var(--transition);
+  /* A transparent marker rail that fills in on the selected row — the same
+     "state lives on an edge" idea as the card accent bar and the active dock
+     tab, so selection reads consistently across the app. */
+  box-shadow: inset 2px 0 0 transparent;
+  transition:
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .dropdown-option:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
 }
 
 .dropdown-option.selected {
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Unlockable options announce themselves */
+.dropdown-option[data-secret] {
+  font-family: var(--font-mono);
+  color: var(--success);
+}
+
+/* Form controls inside settings panels */
+.field-select {
+  width: 100%;
+  padding: 9px 10px;
+  margin-bottom: 10px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.field-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 /* Loading Spinner */
@@ -595,30 +838,90 @@ body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-
   }
 }
 
-/* Buttons */
+/* ── Buttons ───────────────────────────────────────────────────────────
+   Flat fills, hairline borders, no gradients. The default button is a
+   bordered ghost; `.btn-primary` is the single solid accent on a screen.
+   Transitions name their properties instead of using `all`, so a hover never
+   accidentally animates layout. */
 .btn {
-  padding: 10px 20px;
-  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
+  line-height: 1.2;
   cursor: pointer;
-  transition: all var(--transition);
-  border: none;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.btn:active {
+  background: var(--bg-active);
+}
+
+.btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .btn-primary {
   background: var(--accent);
-  color: white;
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
-/* Scrollbar — thin, Apple-like */
+.btn-primary:active {
+  background: var(--accent);
+}
+
+/* For irreversible actions inside a confirm dialog — same weight as
+   btn-primary (solid, the one thing you're being asked to actually decide),
+   just in the danger colour instead of the accent. */
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  filter: brightness(1.1);
+}
+
+.btn-danger:active {
+  filter: brightness(0.95);
+}
+
+/* Scrollbar — a hairline, matching the rest of the system */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -626,12 +929,20 @@ body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-pill);
+  background: var(--border-default);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.30);
+  background: var(--border-strong);
+  background-clip: content-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
 }
 
 /* Welcome Screen */
@@ -654,13 +965,15 @@ body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-
   z-index: 2;
 }
 
+/* The indigo→violet gradient wordmark is gone. It's the most over-used
+   heading treatment on the web and said nothing about this app; a tightly
+   tracked solid heading with a mono kicker underneath does more work. */
 .welcome-card h1 {
-  font-size: 2rem;
-  margin-bottom: 12px;
-  background: linear-gradient(to right, #6366f1, #a855f7);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+  color: var(--text-primary);
 }
 
 .welcome-card p {
@@ -688,60 +1001,219 @@ body[data-theme='light'] .week-indicator-chip[data-week='even'] .week-indicator-
   padding-left: 4px;
 }
 
-select {
+/* Inputs are recessed wells: darker than the surface they sit on, so a form
+   reads as a set of slots cut into the panel rather than tiles stacked on it. */
+select,
+input[type="text"],
+input[type="search"] {
   width: 100%;
-  padding: 12px;
-  border-radius: var(--radius-md);
-  background: rgba(18, 18, 26, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: 1rem;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
   outline: none;
-  transition: all var(--transition);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
   appearance: none;
   cursor: pointer;
 }
 
-select:focus {
+select::placeholder,
+input::placeholder {
+  color: var(--text-tertiary);
+}
+
+select:focus,
+input[type="text"]:focus,
+input[type="search"]:focus {
   border-color: var(--accent);
-  background: rgba(18, 18, 26, 0.8);
+  /* Inset rather than an outer ring — an outer ring on a 2px corner reads as
+     a second, misaligned border. */
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .start-btn {
   margin-top: 12px;
-  padding: 14px;
-  font-size: 1rem;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  padding: 13px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
 }
 
-.start-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+.start-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: none;
+  box-shadow: none;
 }
 
 .start-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
+/* The dashed border is the app's consistent signal for "optional / secondary
+   path" — same vocabulary as a user-customised card. */
 .welcome-import-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  color: var(--text-primary);
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-secondary);
 }
 
 .welcome-import-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .spinner-container {
   padding: 40px;
   display: flex;
   justify-content: center;
+}
+
+/* ── Toasts ───────────────────────────────────────────────────────────
+   Fixed to the bottom centre, above everything, and the one other place
+   (with modals and the dock label) that earns a shadow. Positioning is CSS;
+   only the stacking offset stays inline, because it depends on whether a
+   second toast is currently on screen. */
+.toast {
+  position: fixed;
+  bottom: 76px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Status is carried by a bar on the leading edge, matching the cards and the
+   dock, rather than by tinting the whole toast. */
+.toast--success { box-shadow: var(--shadow-lg), inset 2px 0 0 var(--success); }
+.toast--error   { box-shadow: var(--shadow-lg), inset 2px 0 0 var(--danger); }
+.toast--undo    { z-index: 1001; }
+
+.toast-text {
+  color: var(--text-secondary);
+}
+
+.toast-text strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.toast-action {
+  padding: 5px 12px;
+  font-size: 0.8125rem;
+}
+
+/* ── "or" separator ───────────────────────────────────────────────────
+   Rules drawn by pseudo-elements rather than sibling divs, so the label
+   stays centred at any width and the markup is one element. */
+.rule-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin: 18px 0;
+}
+
+.rule-label::before,
+.rule-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.rule-label span {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.empty-state-message {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+}
+
+/* ── Long-form pages (privacy policy) ─────────────────────────────────
+   A measured column. Line length is capped at ~72 characters because the
+   panel is otherwise as wide as the viewport allows and body text at that
+   measure is genuinely hard to track back from. */
+.prose-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 72px 20px 100px;
+}
+
+.prose-page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.prose-page-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.prose-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+.prose-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.prose-body {
+  margin: 0;
+  max-width: 68ch;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.prose-rule {
+  width: 100%;
+  height: 1px;
+  border: 0;
+  background: var(--border-subtle);
 }
 
 /* Background Container for React Bits backgrounds */
@@ -771,23 +1243,31 @@ select:focus {
   z-index: 1;
 }
 
-/* Toggle Switch */
+/* Toggle — square, like everything else. The iOS pill was the last rounded
+   control in the app and stood out badly once the cards went flat. */
 .toggle {
-  width: 44px;
-  height: 26px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.1);
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-default);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  transition: all var(--transition);
+  font-size: 0.7rem;
+  color: transparent;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
   cursor: pointer;
 }
 
 .toggle.active {
   background: var(--accent);
-  color: white;
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 /* App Content */
@@ -829,34 +1309,52 @@ select:focus {
 }
 
 .tt-grid .day-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
   padding: var(--space-3) var(--space-2);
   border-left: 1px solid var(--grid-line);
   border-radius: 0;
   background: none;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-secondary);
 }
 
+/* Today is marked with a rule along the top of the column rather than a
+   filled block. The fill made one column shout across an otherwise quiet
+   grid; a 2px edge is just as findable and doesn't unbalance the layout. */
 .tt-grid .day-header.today {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
+/* Pinned to the header's own right edge, out of the flex flow, so it never
+   shifts the day name off the center every other column shares. */
 .day-header-today-badge {
-  font-size: 0.6875rem;
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
   font-weight: 500;
-  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
 }
 
+/* Times are data — mono and tabular, so the whole column aligns on the colon. */
 .tt-grid .time-cell {
   border-top: 1px solid var(--grid-line);
   border-radius: 0;
   background: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--text-tertiary);
 }
 
@@ -914,18 +1412,22 @@ select:focus {
   }
 }
 
-/* Light theme: neutralize the legacy boxed day-header look inside the grid */
+/* Light theme: neutralize the legacy boxed day-header look inside the grid,
+   but still light like the cards — not transparent, which let .tt-grid's
+   darker canvas colour show through underneath. */
 body[data-theme='light'] .tt-grid .day-header {
-  background: none;
+  background: var(--bg-surface);
   border: none;
   border-left: 1px solid var(--grid-line);
-  color: var(--sap-navy);
+  color: var(--text-primary);
 }
 
 body[data-theme='light'] .tt-grid .day-header.today {
-  background: var(--sap-green);
-  border-color: var(--sap-green);
-  color: #fff;
+  background: var(--accent-subtle);
+  border: none;
+  border-left: 1px solid var(--grid-line);
+  color: var(--sap-green);
+  box-shadow: inset 0 2px 0 var(--sap-green);
 }
 
 /* Compact tier (spec §2.5): shrink type before ever allowing scroll */
@@ -1016,12 +1518,27 @@ body[data-theme='light'] .tt-grid .day-header.today {
   border-radius: var(--radius-md);
   padding: 0;
   min-height: 86px;
-  height: 86px;
-  /* Fixed height for percentage-based children to work */
-  border: 2px solid transparent;
-  transition: all var(--transition);
+  /* Stretches to fill its (now 1fr) grid row instead of pinning every row to
+     86px regardless of available height; the min-height keeps it from ever
+     going smaller. Still a definite height for percentage-based children,
+     since the grid row itself is a definite size at layout time. */
+  height: 100%;
+  /* Visible by default so the empty grid has structure; suppressed for
+     cells that hold a card (below) so filled cells don't get a double
+     border — the card's own border already defines its edge. */
+  border: 2px solid var(--grid-line);
+  transition:
+  background var(--dur-fast) var(--ease),
+  border-color var(--dur-fast) var(--ease),
+  color var(--dur-fast) var(--ease),
+  opacity var(--dur-fast) var(--ease);
   cursor: default;
   /* overflow: hidden; removed to allow classes to span cells natively */
+}
+
+.planner-slot-cell.has-selection,
+.planner-slot-cell.is-covered {
+  border-color: transparent;
 }
 
 .planner-slot-cell.clickable {
@@ -1029,8 +1546,8 @@ body[data-theme='light'] .tt-grid .day-header.today {
 }
 
 .planner-slot-cell.clickable:not(.has-selection):not(.is-covered):hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  background: rgba(99, 102, 241, 0.1) !important;
+  border-color: var(--accent-line);
+  background: var(--accent-subtle) !important;
 }
 
 .planner-slot-cell.active:not(.has-selection) {
@@ -1061,7 +1578,7 @@ body[data-theme='light'] .tt-grid .day-header.today {
 .planner-slot-cell .half-slot-card-wrapper.active .class-card {
   border-color: var(--accent) !important;
   /* Use a subtle inset shadow to keep the border crisp at the corners */
-  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
 .planner-slot-cell .half-slot-card-wrapper .class-card {
@@ -1079,7 +1596,7 @@ body[data-theme='light'] .tt-grid .day-header.today {
 }
 
 .planner-slot-cell.clickable .empty-slot-plus:hover {
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-subtle);
 }
 
 .planner-grid-wrapper.empty {
@@ -1112,29 +1629,29 @@ body[data-theme='light'] .tt-grid .day-header.today {
 }
 
 .empty-slot-plus span {
-  font-size: 1.5rem;
-  color: #6366f1;
-  opacity: 0.4;
+  font-size: 1.25rem;
+  color: var(--text-tertiary);
+  opacity: 0.7;
   font-weight: 300;
-  transition: all var(--transition);
+  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
 
 .empty-slot-plus:hover span {
-  opacity: 0.8;
-  transform: scale(1.1);
+  opacity: 1;
+  color: var(--accent);
 }
 
 .half-slot-plus span {
-  font-size: 1.25rem;
-  color: #6366f1;
-  opacity: 0.4;
+  font-size: 1.125rem;
+  color: var(--text-tertiary);
+  opacity: 0.7;
   font-weight: 300;
-  transition: all var(--transition);
+  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
 
 .half-slot-plus:hover span {
-  opacity: 0.8;
-  transform: scale(1.1);
+  opacity: 1;
+  color: var(--accent);
 }
 
 /* Half-slot plus button (for bi-weekly cells with one selection) */
@@ -1145,15 +1662,17 @@ body[data-theme='light'] .tt-grid .day-header.today {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  transition: background var(--transition);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  /* Dashed = "there could be something here" — the same signal the import
+     button and user-customised cards use. */
+  border: 1px dashed var(--border-subtle);
   box-sizing: border-box;
 }
 
 .planner-slot-cell.clickable .half-slot-plus:hover {
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--accent-subtle);
 }
 
 /* Planner Backdrop */
@@ -1164,8 +1683,8 @@ body[data-theme='light'] .tt-grid .day-header.today {
   right: 0;
   bottom: 0;
   z-index: 5;
-  background: rgba(0, 0, 0, 0.3);
-  animation: fadeIn 0.15s ease;
+  background: rgba(0, 0, 0, 0.35);
+  animation: fadeIn var(--dur-fast) var(--ease);
 }
 
 /* Planner Dropdown */
@@ -1176,12 +1695,10 @@ body[data-theme='light'] .tt-grid .day-header.today {
   max-height: 320px;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-  animation: slideDown 0.2s ease;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  animation: slideDown var(--dur-base) var(--ease-out);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-xl);
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1192,34 +1709,38 @@ body[data-theme='light'] .tt-grid .day-header.today {
 }
 
 /* Dropdown delete button */
+/* Destructive action: outlined, not a saturated red slab. A filled #ff4444
+   button with a red glow was the loudest thing on the screen and drew the eye
+   straight to "delete" every time the dropdown opened. The outline reads as
+   destructive without competing with the class list above it, and fills in on
+   hover, where the intent is already deliberate. */
 .dropdown-delete-btn {
-  display: flex !important;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   margin-top: 8px;
-  background: #ff4444 !important;
-  border: 1px solid #ff0000 !important;
+  background: transparent;
+  border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
-  color: white !important;
-  font-size: 0.9rem;
-  font-weight: 600;
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
-  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+  box-shadow: none;
 }
 
 .dropdown-delete-btn:hover {
-  background: #ff1111 !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
-}
-
-body[data-theme='light'] .dropdown-delete-btn {
-  background: #ef4444 !important;
-  border-color: #dc2626 !important;
+  background: var(--danger);
+  color: #fff;
+  transform: none;
+  box-shadow: none;
 }
 
 @keyframes slideDown {
@@ -1282,13 +1803,14 @@ body[data-theme='light'] .dropdown-delete-btn {
   }
 
   .planner-day-column .planner-column-header {
-    font-size: 1rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text-primary);
     padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--bg-hover);
     border-radius: var(--radius-sm);
-    border-left: 4px solid var(--accent);
+    /* 2px, matching the card accent bars — 4px read as a different system. */
+    border-left: 2px solid var(--accent);
     text-align: left;
     margin-bottom: 2px;
   }
@@ -1320,11 +1842,10 @@ body[data-theme='light'] .dropdown-delete-btn {
     padding: 4px 0;
     font-size: 0.65rem;
     color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-inset);
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--bg-hover);
     box-sizing: border-box;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     min-height: 0;
   }
 
@@ -1350,13 +1871,14 @@ body[data-theme='light'] .dropdown-delete-btn {
   margin: 4px 0;
   color: var(--text-secondary);
   opacity: 0.8;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: rgba(255, 255, 255, 0.03);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.08em;
+  background: var(--bg-inset);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dropdown-divider span {
@@ -1377,8 +1899,8 @@ body[data-theme='light'] .dropdown-delete-btn {
 .planner-slot-cell .slot-bottom.half-slot-plus {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
-  /* Add separator line to the bottom card so the join is visible but subtle */
-  border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+  /* Separator so the join between the two halves stays visible */
+  border-top: 1px solid var(--border-default) !important;
 }
 
 .planner-slot-cell .slot-single .class-card {
@@ -1423,22 +1945,20 @@ body[data-theme='light'] .dropdown-delete-btn {
   position: absolute;
   top: 4px;
   right: 4px;
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(220, 38, 38, 0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  color: white;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-xs);
+  background: var(--danger);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transition: all var(--transition);
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
   z-index: 200;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: none;
 }
 
 .half-slot-card-wrapper:hover .half-slot-delete-btn {
@@ -1446,20 +1966,21 @@ body[data-theme='light'] .dropdown-delete-btn {
 }
 
 .half-slot-delete-btn:hover {
-  background: rgba(239, 68, 68, 1);
-  transform: scale(1.15);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background: #fff;
+  border-color: #fff;
+  color: var(--danger);
+  transform: none;
+  box-shadow: none;
 }
 
 .shared-groups-btn {
   position: absolute;
   bottom: 8px;
   right: 8px;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  font-family: var(--font-mono);
   border-radius: var(--radius-sm);
   padding: 2px 6px;
   font-size: 10px;
@@ -1469,7 +1990,11 @@ body[data-theme='light'] .dropdown-delete-btn {
   gap: 4px;
   cursor: help;
   z-index: 10;
-  transition: all var(--transition);
+  transition:
+  background var(--dur-fast) var(--ease),
+  border-color var(--dur-fast) var(--ease),
+  color var(--dur-fast) var(--ease),
+  opacity var(--dur-fast) var(--ease);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1562,19 +2087,24 @@ body[data-theme='terminal'] .planner-slot-cell.clickable:not(.has-selection):not
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition);
-  font-size: 0.8rem;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+  font-family: inherit;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
-  background: #2a2a3a;
-  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
 }
 
 .planner-settings-btn:hover {
-  background: #3a3a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .planner-settings-btn svg {
@@ -1587,9 +2117,9 @@ body[data-theme='terminal'] .planner-slot-cell.clickable:not(.has-selection):not
 
 /* Sapientia theme */
 body[data-theme='light'] .planner-settings-btn {
-  background: #e2e8f0;
+  background: var(--bg-surface);
   color: var(--text-primary);
-  border-color: var(--border);
+  border-color: var(--border-default);
 }
 
 body[data-theme='light'] .planner-settings-btn:hover {
@@ -1624,7 +2154,7 @@ body[data-theme='terminal'] .planner-settings-btn:hover {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-hover);
   border-bottom: 1px solid var(--border);
   font-size: 0.8rem;
   font-weight: 600;
@@ -1639,11 +2169,15 @@ body[data-theme='terminal'] .planner-settings-btn:hover {
   font-size: 16px;
   padding: 2px 6px;
   border-radius: var(--radius-xs);
-  transition: all var(--transition);
+  transition:
+  background var(--dur-fast) var(--ease),
+  border-color var(--dur-fast) var(--ease),
+  color var(--dur-fast) var(--ease),
+  opacity var(--dur-fast) var(--ease);
 }
 
 .modify-panel-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-active);
   color: var(--text-primary);
 }
 
@@ -1674,14 +2208,18 @@ body[data-theme='terminal'] .planner-settings-btn:hover {
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+  background var(--dur-fast) var(--ease),
+  border-color var(--dur-fast) var(--ease),
+  color var(--dur-fast) var(--ease),
+  opacity var(--dur-fast) var(--ease);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
   color: var(--text-secondary);
 }
 
 .modify-wt-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-active);
   color: var(--text-primary);
 }
 
@@ -1706,7 +2244,11 @@ body[data-theme='terminal'] .planner-settings-btn:hover {
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+  background var(--dur-fast) var(--ease),
+  border-color var(--dur-fast) var(--ease),
+  color var(--dur-fast) var(--ease),
+  opacity var(--dur-fast) var(--ease);
   border: 1px solid rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.1);
   color: var(--error, #ef4444);
@@ -1715,7 +2257,7 @@ body[data-theme='terminal'] .planner-settings-btn:hover {
 
 .modify-remove-btn:hover {
   background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.5);
+  border-color: var(--danger);
 }
 
 .modify-reset-btn {
@@ -1724,15 +2266,19 @@ body[data-theme='terminal'] .planner-settings-btn:hover {
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+  background var(--dur-fast) var(--ease),
+  border-color var(--dur-fast) var(--ease),
+  color var(--dur-fast) var(--ease),
+  opacity var(--dur-fast) var(--ease);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
   color: var(--text-secondary);
   text-align: center;
 }
 
 .modify-reset-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-active);
   color: var(--text-primary);
 }
 

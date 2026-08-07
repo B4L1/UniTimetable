@@ -169,7 +169,7 @@ const Onboarding: React.FC = () => {
 
     return (
         <div className="onboarding-container">
-            <div className="onboarding-card glass-card">
+            <div className="onboarding-card panel">
                 <h1>Üdvözlünk!</h1>
                 <p className="onboarding-intro">
                     Kérjük, válaszd ki a csoportodat vagy a nevedet az alábbiak közül. Ezt csak egyszer kell megtenned – elmentjük a választásodat a fiókodhoz, így az órarended automatikusan betöltődik bármely eszközön, amelyen bejelentkezel.

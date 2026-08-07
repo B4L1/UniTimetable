@@ -6,26 +6,24 @@ import { googleLogout } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass } from '@shared/index';
 import type { ClassData, ColorTheme, BackgroundEffect } from '@shared/lib/types';
-import {
-    useBackgroundEffect, setBackgroundEffect,
-    hasAcknowledgedPerfWarning, acknowledgePerfWarning,
-    prefersReducedMotion,
-} from '../utils/backgroundEffect';
+import { useBackgroundEffect, setBackgroundEffect, prefersReducedMotion } from '../utils/backgroundEffect';
+import { showToast } from '../stores/toastStore';
+import { confirmDialog } from '../stores/confirmStore';
 
+// 'Sötét üveg' (dark-glass) is gone — the frosted look was retired in the v4
+// redesign, and anyone still on it is migrated to plain dark on load.
 const COLOR_THEMES: { id: ColorTheme; label: string; icon: string; secret?: boolean }[] = [
     { id: 'light', label: 'Világos (Sapientia)', icon: '🏛️' },
     { id: 'dark', label: 'Sötét', icon: '🌑' },
-    { id: 'dark-glass', label: 'Sötét üveg', icon: '🧊' },
     { id: 'terminal', label: 'Faulty Terminal', icon: '💻', secret: true },
 ];
 
+// CSS textures now, not WebGL scenes — hence no performance warning.
 const BACKGROUND_EFFECTS: { id: BackgroundEffect; label: string; icon: string; secret?: boolean }[] = [
-    { id: 'none', label: 'Nincs', icon: '✨' },
-    { id: 'aurora', label: 'Aurora', icon: '🌌' },
-    { id: 'pixel-blast', label: 'Pixel Blast', icon: '👾' },
-    { id: 'iridescence', label: 'Iridescence', icon: '🌈' },
-    { id: 'liquid-chrome', label: 'Liquid Chrome', icon: '💎' },
-    { id: 'faulty-terminal', label: 'Faulty Terminal', icon: '📟', secret: true },
+    { id: 'none', label: 'Nincs', icon: '—' },
+    { id: 'grid', label: 'Rács', icon: '▦' },
+    { id: 'dots', label: 'Pontok', icon: '⁘' },
+    { id: 'scan', label: 'Scanlines', icon: '▤', secret: true },
 ];
 
 interface SettingsProps {
@@ -42,13 +40,6 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
     const reducedMotion = prefersReducedMotion();
 
     const handleEffectSelect = (effect: BackgroundEffect) => {
-        if (effect !== 'none' && !hasAcknowledgedPerfWarning()) {
-            const ok = confirm(
-                'Az animált hátterek grafikus effekteket használnak, ami régebbi vagy gyengébb eszközökön lassíthatja az alkalmazást.\n\nBiztosan bekapcsolod?'
-            );
-            if (!ok) return;
-            acknowledgePerfWarning();
-        }
         setBackgroundEffect(effect);
         setShowEffectDropdown(false);
     };
@@ -100,7 +91,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
         if (newCount === 10) {
             await setFaultyTerminalUnlocked(true);
             await updatePreferences({ colorTheme: 'terminal' });
-            alert("SYSTEM FAILURE IMMINENT... Theme unlocked.");
+            showToast('SYSTEM FAILURE IMMINENT... Theme unlocked.', 'success');
             setVersionClickCount(0);
         }
     };
@@ -127,7 +118,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
             {/* Color theme + background effect */}
             <div className="settings-section">
                 <h2>Megjelenés</h2>
-                <div className="settings-card glass-card">
+                <div className="settings-card panel">
                     {/* Color theme (synced token map) */}
                     <div
                         className="settings-row"
@@ -139,7 +130,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                         </div>
                         <div className="settings-value">
                             {COLOR_THEMES.find(t => t.id === preferences.colorTheme)?.label || 'Világos'}
-                            <span style={{ marginLeft: 8 }}>{showThemeDropdown ? '▲' : '▼'}</span>
+                            <span className="settings-caret">{showThemeDropdown ? '▲' : '▼'}</span>
                         </div>
                     </div>
                     {showThemeDropdown && (
@@ -152,7 +143,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                         updatePreferences({ colorTheme: theme.id });
                                         setShowThemeDropdown(false);
                                     }}
-                                    style={theme.secret ? { color: '#0f0', fontFamily: 'monospace' } : undefined}
+                                    data-secret={theme.secret || undefined}
                                 >
                                     <span>{theme.icon} {theme.label}</span>
                                     {preferences.colorTheme === theme.id && <span>✓</span>}
@@ -161,26 +152,26 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                         </div>
                     )}
 
-                    {/* Animated background effect (device-local, perf warning) */}
+                    {/* Ambient background (device-local, CSS only) */}
                     <div
-                        className="settings-row"
-                        style={{ borderTop: '1px solid var(--border)', opacity: reducedMotion ? 0.5 : 1 }}
+                        className="settings-row settings-row--bordered"
+                        style={{ opacity: reducedMotion ? 0.5 : 1 }}
                         onClick={() => { if (!reducedMotion) { setShowEffectDropdown(!showEffectDropdown); setShowThemeDropdown(false); } }}
                     >
-                        <div className="settings-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span>🌠</span>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span>Animált háttér</span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'normal', marginTop: '2px' }}>
+                        <div className="settings-label">
+                            <span>▦</span>
+                            <div className="settings-label-stack">
+                                <span>Háttérminta</span>
+                                <span className="settings-label-hint">
                                     {reducedMotion
                                         ? 'Kikapcsolva (csökkentett mozgás beállítás aktív)'
-                                        : 'Gyengébb eszközökön lassíthatja az alkalmazást · csak ezen az eszközön'}
+                                        : 'Csak ezen az eszközön'}
                                 </span>
                             </div>
                         </div>
                         <div className="settings-value">
                             {BACKGROUND_EFFECTS.find(t => t.id === backgroundEffect)?.label || 'Nincs'}
-                            {!reducedMotion && <span style={{ marginLeft: 8 }}>{showEffectDropdown ? '▲' : '▼'}</span>}
+                            {!reducedMotion && <span className="settings-caret">{showEffectDropdown ? '▲' : '▼'}</span>}
                         </div>
                     </div>
                     {showEffectDropdown && !reducedMotion && (
@@ -190,7 +181,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                     key={effect.id}
                                     className={`dropdown-option ${backgroundEffect === effect.id ? 'selected' : ''}`}
                                     onClick={() => handleEffectSelect(effect.id)}
-                                    style={effect.secret ? { color: '#0f0', fontFamily: 'monospace' } : undefined}
+                                    data-secret={effect.secret || undefined}
                                 >
                                     <span>{effect.icon} {effect.label}</span>
                                     {backgroundEffect === effect.id && <span>✓</span>}
@@ -204,7 +195,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
             {/* Timetable display options */}
             <div className="settings-section">
                 <h2>Órarend</h2>
-                <div className="settings-card glass-card">
+                <div className="settings-card panel">
                     <div
                         className="settings-row"
                         onClick={() => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator })}
@@ -222,11 +213,11 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                         className="settings-row"
                         onClick={() => updatePreferences({ invertWeekParity: !preferences.invertWeekParity })}
                     >
-                        <div className="settings-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="settings-label">
                             <span>🔄</span>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div className="settings-label-stack">
                                 <span>Páros/Páratlan hét megfordítása</span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'normal', marginTop: '2px' }}>Eltérés a hivatalos akadémiai naptártól</span>
+                                <span className="settings-label-hint">Eltérés a hivatalos akadémiai naptártól</span>
                             </div>
                         </div>
                         <div className={`toggle ${preferences.invertWeekParity ? 'active' : ''}`}>
@@ -239,7 +230,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
             {/* Management (Class & Data) */}
             <div className="settings-section">
                 <h2>Kezelés</h2>
-                <div className="settings-card glass-card">
+                <div className="settings-card panel">
                     {/* Selected Class */}
                     <div
                         className="settings-row clickable"
@@ -251,11 +242,11 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                         </div>
                         <div className="settings-value">
                             {selectedClass?.name || 'Nincs kiválasztva'}
-                            <span style={{ marginLeft: 8 }}>{showClassSelector ? '▲' : '▼'}</span>
+                            <span className="settings-caret">{showClassSelector ? '▲' : '▼'}</span>
                         </div>
                     </div>
                     {showClassSelector && (
-                        <div className="dropdown-content" style={{ padding: '16px' }}>
+                        <div className="dropdown-content dropdown-content--form">
                             {/* Faculty */}
                             <select
                                 value={selectedFaculty}
@@ -264,7 +255,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                     setSelectedYear(null);
                                     setSelectedGroup('');
                                 }}
-                                style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+                                className="field-select"
                             >
                                 <option value="">Válassz szakot...</option>
                                 {faculties.map(f => <option key={f} value={f}>{f}</option>)}
@@ -278,7 +269,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                         setSelectedYear(Number(e.target.value));
                                         setSelectedGroup('');
                                     }}
-                                    style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+                                    className="field-select"
                                 >
                                     <option value="">Válassz évet...</option>
                                     {years.map(y => <option key={y} value={y}>{y}. év</option>)}
@@ -290,7 +281,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                                 <select
                                     value={selectedGroup}
                                     onChange={(e) => setSelectedGroup(e.target.value)}
-                                    style={{ width: '100%', padding: '10px', marginBottom: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+                                    className="field-select"
                                 >
                                     <option value="">Válassz csoportot...</option>
                                     {groups.map(g => <option key={g} value={g}>{g}</option>)}
@@ -310,16 +301,18 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                         </div>
                     )}
                     <div
-                        className="settings-row clickable"
-                        style={{ borderTop: '1px solid var(--border)' }}
-                        onClick={() => {
-                            if (confirm('Biztosan törölni szeretnél minden helyi adatot és beállítást?')) {
-                                const { resetApp } = useAppStore.getState();
-                                resetApp();
-                            }
+                        className="settings-row clickable settings-row--bordered"
+                        onClick={async () => {
+                            const ok = await confirmDialog(
+                                'Biztosan törölni szeretnél minden helyi adatot és beállítást?',
+                                { confirmLabel: 'Törlés', danger: true },
+                            );
+                            if (!ok) return;
+                            const { resetApp } = useAppStore.getState();
+                            resetApp();
                         }}
                     >
-                        <div className="settings-label" style={{ color: 'var(--error)' }}>
+                        <div className="settings-label destructive-text">
                             <span>🗑️</span>
                             <span>Alkalmazás alaphelyzetbe állítása</span>
                         </div>
@@ -329,20 +322,19 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                     </div>
 
                     {user?.email && (
-                        <div className="settings-row" style={{ borderTop: '1px solid var(--border)', cursor: 'default' }}>
+                        <div className="settings-row settings-row--bordered settings-row--static">
                             <div className="settings-label">
                                 <span>📧</span>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bejelentkezve mint</span>
-                                    <span>{user.email}</span>
+                                <div className="settings-label-stack">
+                                    <span className="settings-label-hint">Bejelentkezve mint</span>
+                                    <span className="mono">{user.email}</span>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     <div
-                        className="settings-row clickable logout-row"
-                        style={{ borderTop: '1px solid var(--border)' }}
+                        className="settings-row clickable logout-row settings-row--bordered"
                         onClick={handleLogout}
                     >
                         <div className="settings-label destructive-text">
@@ -360,13 +352,13 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
             {/* Version - Easter Egg Target */}
             <div className="settings-section">
                 <h2>Névjegy</h2>
-                <div className="settings-card glass-card">
-                    <div className="settings-row" onClick={handleVersionClick} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div className="settings-card panel">
+                    <div className="settings-row settings-row--version" onClick={handleVersionClick}>
                         <div className="settings-label">
                             <span>ℹ️</span>
                             <span>Verzió</span>
                         </div>
-                        <div className="settings-value" style={{ color: versionClickCount > 5 ? 'var(--accent)' : 'inherit', transition: 'color 0.2s' }}>
+                        <div className={`settings-value mono ${versionClickCount > 5 ? 'is-warning' : ''}`}>
                             {getVersionText()}
                         </div>
                     </div>
@@ -374,8 +366,7 @@ export default function Settings({ onNavigateToPrivacy }: SettingsProps = {}) {
                     {/* Privacy Policy Link */}
                     {onNavigateToPrivacy && (
                         <div
-                            className="settings-row clickable"
-                            style={{ borderTop: '1px solid var(--border)' }}
+                            className="settings-row clickable settings-row--bordered"
                             onClick={onNavigateToPrivacy}
                         >
                             <div className="settings-label">

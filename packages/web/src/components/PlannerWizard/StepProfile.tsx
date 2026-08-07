@@ -3,6 +3,7 @@
 
 import { useAppStore } from '../../stores/appStore';
 import { formatClassName } from '../../utils/format';
+import { confirmDialog } from '../../stores/confirmStore';
 import { useWizardStore } from './wizardStore';
 
 export default function StepProfile() {
@@ -10,9 +11,11 @@ export default function StepProfile() {
     const setStep = useWizardStore(s => s.setStep);
 
     const changeClass = async () => {
-        if (window.confirm('Csoport módosítása? A tervező beállításai megmaradnak, de az órarended újra kell válaszd.')) {
-            await resetClassSelection();
-        }
+        const ok = await confirmDialog(
+            'Csoport módosítása? A tervező beállításai megmaradnak, de az órarended újra kell válaszd.',
+            { confirmLabel: 'Módosítás' },
+        );
+        if (ok) await resetClassSelection();
     };
 
     return (

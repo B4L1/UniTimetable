@@ -5,39 +5,29 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
 import { webStorage } from '../stores/webStorage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { fetchTimetableEntries, fetchTimetableEntriesByIds, fetchTeacherTimetable, assignSubjectColors } from '@shared/index';
+import {
+    fetchTimetableEntries, fetchTimetableEntriesByIds, fetchTeacherTimetable, assignSubjectColors,
+    TIME_SLOTS, DAY_NAMES, computeSlotSpan, timeToMinutes as getMinutes, generateICS,
+} from '@shared/index';
+import { showToast } from '../stores/toastStore';
 import type { AvailableClassEntry } from '@shared/lib/api';
 import type { TimetableEntry } from '@shared/lib/types';
 import ClassCard from './ClassCard';
 import ClassDetailModal from './ClassDetailModal';
-
-// 2-hour time slots
-const TIME_SLOTS = [
-    { label: '1-2', start: '08:00', end: '09:50' },
-    { label: '3-4', start: '10:00', end: '11:50' },
-    { label: '5-6', start: '12:30', end: '14:20' },
-    { label: '7-8', start: '14:30', end: '16:20' },
-    { label: '9-10', start: '16:30', end: '18:20' },
-    { label: '11-12', start: '18:30', end: '20:20' },
-];
+import { revealGrid } from '../motion';
 
 // Saturday (index 5) exists in edupage data for some programs; the grid only
 // shows it when the displayed timetable actually has a Saturday class.
-const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', 'Szombat'];
+const DAYS = DAY_NAMES;
 
 import { getAcademicWeek } from '../utils/calendar';
 
-// Helper to get minutes from "HH:MM"
-function getMinutes(timeStr: string): number {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
-}
-
 interface TimetableProps {
     onExportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+    onExportIcsRef?: React.MutableRefObject<(() => void) | null>;
 }
 
-export default function Timetable({ onExportRef }: TimetableProps = {}) {
+export default function Timetable({ onExportRef, onExportIcsRef }: TimetableProps = {}) {
     const { selectedClass, selectedTeacher, timetableEntries, setTimetableEntries, userSelections, isLoading, preferences, customEntries } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
     const gridRef = useRef<HTMLDivElement>(null);
@@ -232,8 +222,8 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
             const exportTitle = selectedClass?.name || selectedTeacher?.name || 'UniTimetable';
             const fileName = `${exportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
 
-            // Lazy: the export pipeline drags in @react-pdf/renderer + pdfjs-dist
-            // (~1.5 MB min) — keep it out of the initial bundle (perf budget B10)
+            // Lazy: keeps the export module's canvas-drawing code out of the
+            // initial bundle (perf budget B10) even though it's now small.
             const { exportTimetableImage } = await import('../export');
             await exportTimetableImage({
                 entries: entriesToDisplay,
@@ -245,15 +235,75 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
             });
         } catch (err) {
             console.error('Export failed:', err);
-            alert('A kép exportálása nem sikerült.');
+            showToast('A kép exportálása nem sikerült.', 'error');
         }
     }, [selectedClass, selectedTeacher, entriesToDisplay]);
 
-    // Wire up export ref so App.tsx dock button can trigger it
+    // Calendar export — turns the timetable into recurring events a real
+    // calendar app can subscribe to. Unlike the PNG (a snapshot of the
+    // currently-viewed week), this covers the whole fortnight: entriesToDisplay
+    // already carries both odd/even variants, and generateICS's own RRULE
+    // handles the alternation, so there's no "which week" to pick here.
+    const handleExportICS = useCallback(() => {
+        try {
+            const exportTitle = selectedClass?.name || selectedTeacher?.name || 'UniTimetable';
+            const ics = generateICS(entriesToDisplay, { calendarName: exportTitle });
+            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `${exportTitle.replace(/\s+/g, '_')}.ics`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('ICS export failed:', err);
+            showToast('A naptár exportálása nem sikerült.', 'error');
+        }
+    }, [selectedClass, selectedTeacher, entriesToDisplay]);
+
+    // Wire up export refs so App.tsx dock buttons can trigger them
     useEffect(() => {
         if (onExportRef) onExportRef.current = handleExportImage;
         return () => { if (onExportRef) onExportRef.current = null; };
     }, [onExportRef, handleExportImage]);
+
+    useEffect(() => {
+        if (onExportIcsRef) onExportIcsRef.current = handleExportICS;
+        return () => { if (onExportIcsRef) onExportIcsRef.current = null; };
+    }, [onExportIcsRef, handleExportICS]);
+
+    /**
+     * Reveal the week's cards once, when a timetable first paints.
+     *
+     * Keyed on the entry-id set rather than on mount: the grid re-renders
+     * constantly (resize tiers, week parity, selection changes) and re-playing
+     * the reveal on every one of those would be intolerable. It should fire
+     * when you land on the screen or switch to a different timetable, and
+     * never otherwise.
+     *
+     * The 2-D stagger radiates from the top-left, so the grid fills in reading
+     * order — earliest day, earliest slot first — which makes the animation
+     * describe the data instead of just decorating it.
+     */
+    const revealKey = useMemo(
+        () => entriesToDisplay.map(e => e.id).join(','),
+        [entriesToDisplay],
+    );
+
+    useEffect(() => {
+        if (!revealKey) return;
+        // rAF: let the browser lay the grid out before we read it, otherwise
+        // the cards animate from wherever they were mid-layout.
+        let cleanup = () => { };
+        const raf = requestAnimationFrame(() => {
+            const cards = gridRef.current?.querySelectorAll('.tt-card-cell');
+            if (cards?.length) cleanup = revealGrid(cards, { grid: [dayCount, TIME_SLOTS.length] });
+        });
+        return () => { cancelAnimationFrame(raf); cleanup(); };
+        // dayCount is intentionally omitted: a Saturday appearing shouldn't
+        // replay the whole reveal.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [revealKey]);
 
     // Grouping computation moved directly to renderer below
 
@@ -344,22 +394,9 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
                             filteredEntries.forEach(entry => {
                                 if (entry.day_of_week === undefined) return;
 
-                                let startSlot = -1;
-                                let endSlot = -1;
-                                TIME_SLOTS.forEach((_, i) => {
-                                    const slotStart = getMinutes(TIME_SLOTS[i].start);
-                                    const slotEnd = getMinutes(TIME_SLOTS[i].end);
-                                    const entryStart = getMinutes(entry.start_time);
-                                    const entryEnd = getMinutes(entry.end_time);
-
-                                    if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
-                                        if (startSlot === -1) startSlot = i;
-                                        endSlot = i;
-                                    }
-                                });
-
-                                if (startSlot === -1) return;
-                                const span = endSlot - startSlot + 1;
+                                const slotSpan = computeSlotSpan(entry.start_time, entry.end_time);
+                                if (!slotSpan) return;
+                                const { startSlot, span } = slotSpan;
                                 (entry as any)._calculatedSpan = span;
 
                                 const key = `${entry.day_of_week}-${startSlot}`;
@@ -479,7 +516,7 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
                     <div className="mobile-day-column" style={{ height: '100%' }}>
                         <div className="mobile-timetable-grid" style={{ gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))` }}>
                             {/* Header row for mobile grid — week chip */}
-                            <div className="glass-card" style={{
+                            <div className="panel" style={{
                                 gridColumn: 1,
                                 gridRow: 1,
                                 display: 'flex',
@@ -490,7 +527,7 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
                             }}>
                                 {weekChip}
                             </div>
-                            <div className={`mobile-day-header glass-card ${currentDayIndex === today ? 'today' : ''}`}
+                            <div className={`mobile-day-header panel ${currentDayIndex === today ? 'today' : ''}`}
                                 style={{
                                     background: currentDayIndex === today ? 'var(--accent)' : 'var(--bg-card)',
                                     gridColumn: 2,
@@ -503,7 +540,7 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
                             {/* Time Slots + Cells */}
                             {TIME_SLOTS.map((slot, slotIndex) => (
                                 <div key={`mobile-slot-${currentDayIndex}-${slotIndex}`} style={{ display: 'contents' }}>
-                                    <div className="mobile-time-cell glass-card" style={{ gridRow: slotIndex + 2, gridColumn: 1 }}>
+                                    <div className="mobile-time-cell panel" style={{ gridRow: slotIndex + 2, gridColumn: 1 }}>
                                         <span className="time-label">{slot.label}</span>
                                         <span className="time-range">{slot.start}</span>
                                     </div>
@@ -521,21 +558,9 @@ export default function Timetable({ onExportRef }: TimetableProps = {}) {
                                 const grouped = new Map<number, AvailableClassEntry[]>();
 
                                 dayEntries.forEach(entry => {
-                                    let startSlot = -1;
-                                    let endSlot = -1;
-                                    TIME_SLOTS.forEach((_, i) => {
-                                        const slotStart = getMinutes(TIME_SLOTS[i].start);
-                                        const slotEnd = getMinutes(TIME_SLOTS[i].end);
-                                        const entryStart = getMinutes(entry.start_time);
-                                        const entryEnd = getMinutes(entry.end_time);
-                                        if (Math.max(entryStart, slotStart) < Math.min(entryEnd, slotEnd)) {
-                                            if (startSlot === -1) startSlot = i;
-                                            endSlot = i;
-                                        }
-                                    });
-
-                                    if (startSlot === -1) return;
-                                    const span = endSlot - startSlot + 1;
+                                    const slotSpan = computeSlotSpan(entry.start_time, entry.end_time);
+                                    if (!slotSpan) return;
+                                    const { startSlot, span } = slotSpan;
                                     (entry as any)._calculatedSpan = span;
 
                                     if (!grouped.has(startSlot)) grouped.set(startSlot, []);
@@ -643,8 +668,8 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
     };
 
     const [currentPos, setCurrentPos] = useState(getPosition());
-    const instanceKeyRef = useRef(0);
-    const prevShowRef = useRef(show);
+    const [instanceKey, setInstanceKey] = useState(0);
+    const [prevShow, setPrevShow] = useState(show);
 
     useEffect(() => {
         setCurrentPos(getPosition());
@@ -653,16 +678,20 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
     // Track toggles to generate a new key when toggled ON
     // This allows the exiting animation to finish going DOWN,
     // while the NEW line comes down from the TOP (-10%)
-    if (show && !prevShowRef.current) {
-        instanceKeyRef.current += 1;
+    // (Adjusting state during render, not a ref, so a discarded render
+    // can't leave the counter out of sync — see react.dev/learn/you-might-not-need-an-effect)
+    if (show !== prevShow) {
+        setPrevShow(show);
+        if (show) {
+            setInstanceKey(k => k + 1);
+        }
     }
-    prevShowRef.current = show;
 
     return (
         <AnimatePresence>
             {show && (
                 <motion.div
-                    key={`timeline-${instanceKeyRef.current}`}
+                    key={`timeline-${instanceKey}`}
                     className="time-marker"
                     initial={{ top: '-10%', opacity: 0 }}
                     animate={{ top: `${currentPos}%`, opacity: 1 }}

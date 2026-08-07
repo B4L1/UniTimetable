@@ -1,7 +1,7 @@
 /* Planner stepper (Phase 4) — semantic tokens only, B10 rules:
    hairline borders for structure, shadows only for elevation,
    every interactive element has default/hover/active/focus-visible/disabled.
-   Rendered as a MODAL over the timetable — glass belongs on modals (§A5). */
+   Rendered as a MODAL over the timetable. */
 
 .wizard-backdrop {
   /* viewport-relative modal size: same share of the screen whether it's a
@@ -17,9 +17,10 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
-  background: rgba(2, 6, 23, 0.45);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* Plain scrim. The 6px blur was the last frosted surface in the app; with
+     the modal itself now opaque and hairlined, blurring the timetable behind
+     it just made the background mush without adding separation. */
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .wizard-modal {
@@ -567,7 +568,7 @@
   overflow: hidden;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-default);
   background: var(--c, var(--accent));
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition), filter var(--transition);
@@ -590,7 +591,6 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   line-height: 1.22;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -607,9 +607,9 @@
   line-height: 1.5;
   padding: 0 5px;
   border-radius: var(--radius-pill);
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.92);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
 }
 /* grip = "this one can move" — bottom-right, always shown on movable cards */
 .sg-grip {
@@ -620,7 +620,6 @@
   color: var(--text-primary);
   opacity: 0.6;
   pointer-events: none;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
 }
 .sg-card.draggable:hover .sg-grip { opacity: 0.95; }
 
@@ -651,14 +650,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
   color: #fff;
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition);
 }
-.sg-icon-btn:hover { background: rgba(0, 0, 0, 0.55); border-color: rgba(255, 255, 255, 0.45); }
+.sg-icon-btn:hover { background: var(--bg-active); border-color: var(--border-strong); }
 .sg-icon-btn.on {
   background: var(--accent);
   border-color: #fff;
@@ -669,6 +668,22 @@
   border-color: #fff;
 }
 .sg-icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* Keyboard/screen-reader path for the drag-to-swap gesture — a native
+   <select> reset to look like the other icon buttons. appearance:none drops
+   the browser's own dropdown arrow so the "⇄" placeholder is the only glyph
+   shown; the dropdown *panel* itself still renders with the OS/browser's
+   normal (readable) styling once opened, which is intentional — this is the
+   one place in the wizard where a native control is better than a themed one. */
+.sg-swap-select {
+  appearance: none;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
+  text-align-last: center;
+}
 
 /* the edit step packs a grid + legend + actions — it fills the modal body
    and its grid flexes, keeping the Save/Javítás row on-screen at any height */
@@ -723,14 +738,14 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
 }
 .wizard-legend-swatch {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   border: 1.5px dashed;
 }
 .wizard-legend-swatch.free { border-color: var(--accent); background: var(--accent-subtle); }

@@ -6,6 +6,7 @@ import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacul
 import type { ClassData } from '@shared/lib/types';
 import BackgroundSelector from './backgrounds/BackgroundSelector';
 import { toggleLightDark, isLightTheme } from '../utils/theme';
+import { showToast } from '../stores/toastStore';
 
 const SunIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -83,13 +84,13 @@ export default function Welcome() {
 
                     await store.setFirstLaunchComplete();
                     await store.initialize();
-                    alert('Sikeres adatvisszaállítás!');
+                    showToast('Sikeres adatvisszaállítás!', 'success');
                 } else {
-                    alert('Érvénytelen fájlformátum.');
+                    showToast('Érvénytelen fájlformátum.', 'error');
                 }
             } catch (error) {
                 console.error('Import failed:', error);
-                alert('Hiba történt az importálás során. Hibás JSON formátum.');
+                showToast('Hiba történt az importálás során. Hibás JSON formátum.', 'error');
             }
         };
         reader.readAsText(file);
@@ -102,33 +103,14 @@ export default function Welcome() {
         <div className="welcome-container" style={{ position: 'relative' }}>
             <BackgroundSelector />
 
-            <button
-                onClick={toggleTheme}
-                style={{
-                    position: 'absolute',
-                    top: '20px',
-                    right: '20px',
-                    zIndex: 10,
-                    background: 'rgba(26, 26, 36, 0.6)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '50%',
-                    width: '48px',
-                    height: '48px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: 'var(--text-primary)',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                    transition: 'all 0.2s ease'
-                }}
-            >
+            {/* Shares .theme-toggle-fab with Login so the control is identical
+                on both entry screens. */}
+            <button className="theme-toggle-fab" onClick={toggleTheme} aria-label="Téma váltása">
                 {/* Same semantics as the dock & login: the icon shows the mode you'll switch TO */}
                 {isLightTheme(preferences.colorTheme) ? <MoonIcon /> : <SunIcon />}
             </button>
 
-            <div className="glass-card welcome-card">
+            <div className="panel welcome-card">
                 <h1 className="welcome-title">
                     👋 Üdvözöllek!
                 </h1>
@@ -141,7 +123,7 @@ export default function Welcome() {
                 ) : (
                     <div className="selection-form">
                         {classes.length === 0 ? (
-                            <div className="empty-state-message" style={{ textAlign: 'center', padding: '20px' }}>
+                            <div className="empty-state-message">
                                 <p>⚠️ Nem sikerült betölteni az osztályokat, vagy még üres az adatbázis.</p>
                                 <button
                                     className="btn btn-primary"
@@ -211,32 +193,14 @@ export default function Welcome() {
                                     Indítás 🚀
                                 </button>
 
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    margin: '20px 0',
-                                    width: '100%',
-                                    opacity: isLightTheme(preferences.colorTheme) ? 1 : 0.6
-                                }}>
-                                    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
-                                    <span style={{ padding: '0 10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>VAGY</span>
-                                    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
-                                </div>
+                                {/* The rules are drawn by .rule-label's own
+                                    pseudo-elements now, so this no longer needs a
+                                    per-theme opacity fudge. */}
+                                <div className="rule-label"><span>VAGY</span></div>
 
                                 <button
                                     className="btn clickable welcome-import-btn"
                                     onClick={() => document.getElementById('welcome-import-file')?.click()}
-                                    style={{
-                                        width: '100%',
-                                        padding: '12px',
-                                        borderRadius: 'var(--radius-md)',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '8px',
-                                        transition: 'all 0.2s ease',
-                                    }}
                                 >
                                     <span>📂</span> Órarend importálása fájlból
                                 </button>

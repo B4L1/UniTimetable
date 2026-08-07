@@ -9,30 +9,41 @@
     position: relative;
 }
 
+/* Shared by Login and Welcome. Square, hairline, and it no longer spins on
+   hover — a 15° rotate-and-scale is a flourish that belonged to the old
+   glass look and reads as jitter next to hard edges. */
 .theme-toggle-fab {
     position: fixed;
-    top: 24px;
-    right: 24px;
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-pill);
-    border: 1px solid var(--border);
-    background: var(--bg-card);
-    color: var(--text-primary);
+    top: 20px;
+    right: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: var(--shadow-md);
-    transition: all var(--transition);
+    box-shadow: none;
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease),
+        color var(--dur-fast) var(--ease);
     z-index: 1000;
 }
 
 .theme-toggle-fab:hover {
-    transform: rotate(15deg) scale(1.1);
-    background: var(--bg-secondary);
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+.theme-toggle-fab:focus-visible {
+    outline: none;
     border-color: var(--accent);
-    color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .login-card {
@@ -43,19 +54,18 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    transition: all 0.3s var(--ease);
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    box-shadow: none;
 }
 
 .login-card h1 {
-    font-size: 2rem;
+    font-size: 1.625rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     margin-bottom: 8px;
-    color: var(--accent);
+    color: var(--text-primary);
 }
 
 .login-subtitle {
@@ -69,66 +79,95 @@
     margin: 20px 0;
 }
 
+/* Colour, not opacity. Opacity multiplies against whatever is behind it, so
+   the same rule lands on a different grey on every surface — the token is
+   the same colour everywhere. */
 .login-disclaimer {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
+    font-size: 0.8125rem;
+    color: var(--text-tertiary);
+    line-height: 1.55;
     margin-top: 10px;
-    opacity: 0.8;
+    text-align: left;
 }
 
+/* ── Sign in with Google ──────────────────────────────────────────────
+   This button follows Google's branding guidelines, which constrain the
+   surface colour, the logo, the wording, the font (Roboto) and the minimum
+   padding. Those are NOT ours to restyle:
+   https://developers.google.com/identity/branding-guidelines
+
+   Corner radius is ours, though. Google offers a rectangular and a pill
+   shape and rectangular is their *default* — so squaring it is compliant,
+   and it stops the one 24px pill on the screen from fighting a card with
+   2px corners.
+
+   The drop shadow is dropped for the same reason it's dropped everywhere
+   else: the 1px #dadce0 border Google specifies already separates the
+   button from the card, so the shadow was doing nothing but adding depth
+   the rest of the system doesn't have. */
 .custom-google-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 12px;
+    width: 100%;
     background: #fff;
-    color: #3c4043;
-    border: 1px solid #dadce0;
-    /* 24px pill per Google Sign-In branding guidelines — intentionally off the token scale */
-    border-radius: 24px;
-    padding: 10px 24px;
+    color: #1f1f1f;
+    border: 1px solid #747775;
+    border-radius: var(--radius-sm);
+    padding: 11px 24px;
     font-size: 14px;
     font-weight: 500;
+    letter-spacing: 0.01em;
     cursor: pointer;
-    transition: all var(--transition);
-    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.30), 0 1px 3px 1px rgba(60,64,67,0.15);
+    transition:
+        background var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
+    box-shadow: none;
     font-family: 'Roboto', 'Google Sans', Arial, sans-serif;
 }
 
 .custom-google-btn:hover {
-    background: #f8f9fa;
-    box-shadow: 0 1px 3px 0 rgba(60,64,67,0.30), 0 4px 8px 3px rgba(60,64,67,0.15);
+    /* Google's specified hover: the brand blue at 8% over the surface. */
+    background: #f2f6fc;
+    border-color: #5f6368;
+    box-shadow: none;
 }
 
 .custom-google-btn:active {
-    background: #eeeeee;
+    background: #e8eefa;
+}
+
+.custom-google-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .google-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
-/* Theme integration */
-body[data-theme='light'] .login-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-}
+/* Theme integration — the light theme no longer needs to re-style the card.
+   It used to add --shadow-lg, which is a floating-element shadow on a piece
+   of in-flow content, and a green heading that disagreed with Welcome's. Both
+   are gone; .panel handles it in every theme now. */
 
-body[data-theme='light'] .login-card h1 {
-    color: var(--sap-green);
-}
-
-/* Dark mode adjustment for the button */
+/* Google's dark-surface variant. Same reasoning as above: their colours,
+   our corner and no shadow. */
 body:not([data-theme='light']) .custom-google-btn {
     background: #131314;
     color: #e3e3e3;
-    border-color: #444746;
+    border-color: #8e918f;
 }
 
 body:not([data-theme='light']) .custom-google-btn:hover {
-    background: #202124;
+    background: #1d1e20;
+    border-color: #a2a9b0;
+}
+
+body:not([data-theme='light']) .custom-google-btn:active {
+    background: #26272a;
 }
 

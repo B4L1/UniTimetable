@@ -1,51 +1,104 @@
-/* ClassCard Component Styles */
+/* ═══════════════════════════════════════════════════════════════════════
+   ClassCard — accent-bar system
+
+   The card fill is NEUTRAL and identical for every subject; the subject
+   colour appears only as a solid bar across the top. This is the whole
+   point of the redesign:
+
+   - Previously the subject colour was the card background, so text contrast
+     varied with every one of the 16 palette entries, and the palette had to
+     stay muted-and-similar to stay readable. Now contrast is fixed by the
+     theme, the palette is free to be as distinct as it likes, and adding a
+     17th colour can never break legibility.
+   - A 3px bar at a consistent position is also easier to scan down a column
+     than 16 fill tints, because the eye compares colours side by side
+     against the same neutral rather than against each other.
+
+   Week parity is encoded in the bar itself: the fortnight is drawn as two
+   halves and the inactive half is knocked back. Odd weeks fill the left
+   half, even weeks the right.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 .class-card {
     height: 100%;
-    padding: 10px 16px;
-    border-radius: var(--radius-md);
+    /* Top padding clears the accent bar, which is absolutely positioned so
+       it can change weight on hover without shifting the content. */
+    padding: calc(var(--card-accent-h) + 7px) 10px 8px;
+    border-radius: var(--radius-sm);
     display: flex;
     flex-direction: column;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     box-sizing: border-box;
     position: relative;
     z-index: 50;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), z-index 0s linear 0.1s;
+    transition:
+        background-color var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease);
 }
 
 .class-card:hover {
     z-index: 100 !important;
-    transition-delay: 0s;
 }
 
-/* Microinteractions (spec §8.2): subtle scale on hover, compress on press.
-   Only the timetable (default) variant — planner cards have their own
-   affordances. */
-.class-card--default:hover {
-    transform: scale(1.02);
-    box-shadow: var(--shadow-md);
+/* ── The bar ──────────────────────────────────────────────────────────── */
+.class-card-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--card-accent-h);
+    background: var(--subject-color);
+    pointer-events: none;
+    transition: height var(--dur-fast) var(--ease);
+}
+
+/* Parity: knock back the half of the fortnight this class does NOT run in.
+   Painting the card background over it at partial opacity (rather than
+   picking a lighter colour) keeps this correct in every theme for free. */
+.class-card.is-odd-week .class-card-accent::after,
+.class-card.is-even-week .class-card-accent::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    background: var(--card-bg);
+    opacity: calc(1 - var(--card-accent-dim));
+}
+
+.class-card.is-odd-week .class-card-accent::after { right: 0; }
+.class-card.is-even-week .class-card-accent::after { left: 0; }
+
+/* ── Hover / press ────────────────────────────────────────────────────
+   No scale, no lift, no shadow — in a flat system those read as artefacts.
+   The card lightens, its border comes forward, and the accent bar thickens.
+   Because the bar is absolute, none of this moves any text. */
+.class-card--default:hover,
+.class-card--dropdown:hover {
+    background: var(--card-bg-hover);
+    border-color: var(--border-strong);
+}
+
+.class-card--default:hover .class-card-accent,
+.class-card--dropdown:hover .class-card-accent {
+    height: calc(var(--card-accent-h) + 2px);
 }
 
 .class-card--default:active {
-    transform: scale(0.98);
+    background: var(--bg-active);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .class-card {
+    .class-card,
+    .class-card-accent {
         transition: none;
-    }
-
-    .class-card--default:hover,
-    .class-card--default:active {
-        transform: none;
     }
 }
 
-/* Content wrapper — truncate, never scroll (spec §2.1/§7.4); the title
-   tooltip carries the full text */
+/* ── Content ──────────────────────────────────────────────────────────── */
 .class-card-content {
     width: 100%;
     height: 100%;
@@ -53,6 +106,7 @@
     flex-direction: column;
     overflow: hidden;
     touch-action: pan-y;
+    min-width: 0;
 }
 
 .class-card--default .class-card-subject {
@@ -69,98 +123,89 @@
     text-overflow: ellipsis;
 }
 
-/* Prevent mobile swiping issues from overflow-y */
 .class-card--compact .class-card-content {
     overflow-y: hidden;
     touch-action: pan-y;
 }
 
-/* Subject */
+/* Subject — the only sans-serif line on the card. No text-shadow: it was
+   there to survive an arbitrary coloured background, and there isn't one
+   any more. */
 .class-card-subject {
     font-weight: 600;
     font-size: 0.75rem;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
-    color: var(--text-primary, white);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    margin-bottom: 4px;
+    line-height: 1.2;
+    letter-spacing: -0.011em;
+    color: var(--text-primary);
+    margin-bottom: 3px;
 }
 
-[data-theme='terminal'] .class-card {
-    position: relative;
-    overflow: hidden;
-}
-
-[data-theme='terminal'] .class-card::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%,
-            rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg,
-            rgba(255, 0, 0, 0.06),
-            rgba(0, 255, 0, 0.02),
-            rgba(0, 0, 255, 0.06));
-    z-index: 2;
-    background-size: 100% 2px, 3px 100%;
-    pointer-events: none;
-}
-
-/* Teacher */
+/* Teacher, room and group are data, not prose — mono, tracked in, tabular. */
 .class-card-teacher {
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.85);
-    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+    color: var(--text-secondary);
+    margin-top: 2px;
 }
 
-/* Footer (room + class name) */
 .class-card-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 6px;
     margin-top: auto;
     padding-top: 6px;
 }
 
-/* Room */
 .class-card-room {
-    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.6875rem;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: -0.02em;
+    color: var(--text-secondary);
 }
 
-/* Class name */
 .class-card-classname {
-    font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.6);
-    background: rgba(0, 0, 0, 0.2);
-    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.625rem;
+    letter-spacing: -0.01em;
+    color: var(--text-tertiary);
+    background: var(--bg-inset);
+    border: 1px solid var(--border-subtle);
+    padding: 1px 4px;
     border-radius: var(--radius-xs);
 }
 
-/* ============================================ */
-/* Variant: Compact */
-/* ============================================ */
+/* ── User-customised entries ──────────────────────────────────────────
+   A dashed hairline reads as "provisional / edited by you" without spending
+   any colour, and stays legible next to the parity split, which already owns
+   the accent bar. */
+.class-card.is-custom {
+    border-style: dashed;
+    border-color: var(--border-strong);
+}
+
+/* ── Variant: compact (mobile / dense grid) ───────────────────────────── */
 .class-card--compact {
-    padding: 10px 10px;
+    padding: calc(var(--card-accent-h) + 5px) 8px 6px;
     min-height: auto;
 }
 
 .class-card--compact:hover {
-    transform: none;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    opacity: 0.8;
+    background: var(--card-bg-hover);
 }
 
 .class-card--compact .class-card-subject {
-    font-size: 0.7rem;
+    font-size: 0.6875rem;
 }
 
 .class-card--compact .class-card-teacher,
 .class-card--compact .class-card-room {
-    font-size: 0.65rem;
+    font-size: 0.625rem;
 }
 
 .class-card--compact .class-card-footer {
@@ -169,10 +214,10 @@
 
 @media (max-width: 768px) {
     .class-card--compact {
-        padding: 4px 8px;
+        padding: calc(var(--card-accent-h) + 3px) 8px 4px;
     }
 
-    /* Only half-cards get row layout */
+    /* Half-cards go to a single row: title, then room, on one line. */
     .class-card--compact.half-card .class-card-content {
         flex-direction: row;
         align-items: center;
@@ -180,7 +225,7 @@
     }
 
     .class-card--compact.half-card .class-card-subject {
-        font-size: 0.65rem;
+        font-size: 0.625rem;
         margin-bottom: 0;
         flex: 1;
         min-width: 0;
@@ -197,137 +242,50 @@
     }
 
     .class-card--compact.half-card .class-card-room {
-        font-size: 0.6rem;
+        font-size: 0.5625rem;
     }
 
     .class-card--compact.half-card .class-card-classname {
-        font-size: 0.55rem;
+        font-size: 0.5625rem;
     }
 }
 
-/* ============================================ */
-/* Variant: Dropdown */
-/* ============================================ */
+/* ── Variant: dropdown (planner picker) ───────────────────────────────── */
 .class-card--dropdown {
     min-height: 86px;
-    padding: 8px 10px;
+    padding: calc(var(--card-accent-h) + 7px) 10px 8px;
 }
 
 .class-card--dropdown .class-card-subject {
-    margin-bottom: 6px;
+    margin-bottom: 5px;
 }
 
-/* ============================================ */
-/* Week Type Visual Indicators */
-/* ============================================ */
-.class-card.is-odd-week::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(-45deg, var(--bg-surface, rgba(30, 30, 42, 0.95)) 50%, transparent 50.1%);
-    z-index: -1;
-    pointer-events: none;
-    border-radius: inherit;
-}
-
-.class-card.is-even-week::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(-45deg, transparent 49.9%, var(--bg-surface, rgba(30, 30, 42, 0.95)) 50%);
-    z-index: -1;
-    pointer-events: none;
-    border-radius: inherit;
-}
-
-/* ============================================ */
-/* Search highlighting */
-/* ============================================ */
+/* ── Search highlighting ──────────────────────────────────────────────
+   An inset ring rather than an outer glow — glows don't belong in a flat
+   system, and they blur the card's edge against its neighbours in a tight
+   grid. */
 .class-card.search-match {
-    border-color: rgba(255, 255, 255, 0.7) !important;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-    transition: box-shadow var(--transition), border-color var(--transition);
+    border-color: var(--accent) !important;
+    border-style: solid;
+    box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .class-card.search-match:hover {
-    border-color: rgba(255, 255, 255, 0.95) !important;
-    box-shadow: 0 0 18px rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    border-color: var(--accent-hover) !important;
+    box-shadow: inset 0 0 0 1px var(--accent-hover);
 }
 
-[data-theme='light'] .class-card.search-match {
-    border-color: var(--sap-green-light, #8bc34a) !important;
-    box-shadow: 0 0 8px rgba(139, 195, 74, 0.3), inset 0 0 0 1px rgba(139, 195, 74, 0.3);
-}
-
-[data-theme='light'] .class-card.search-match:hover {
-    border-color: var(--sap-green-light, #8bc34a) !important;
-    box-shadow: 0 0 18px rgba(139, 195, 74, 0.45), inset 0 0 0 1px rgba(139, 195, 74, 0.5);
-}
-
-/* ============================================ */
-/* User-Customized Card Indicator */
-/* ============================================ */
-
-/* For half cards (odd/even), we add a striped gap across the diagonal split */
-.class-card--dropdown.is-odd-week.is-custom::before {
-    background: linear-gradient(-45deg, 
-        rgba(30, 30, 42, 0.95) 43%, 
-        var(--subject-color) 43%, var(--subject-color) 46%, 
-        rgba(30, 30, 42, 0.95) 46%, rgba(30, 30, 42, 0.95) 50%, 
-        transparent 50%
-    );
-}
-
-.class-card--dropdown.is-even-week.is-custom::before {
-    background: linear-gradient(-45deg, 
-        transparent 50%, 
-        rgba(30, 30, 42, 0.95) 50%, rgba(30, 30, 42, 0.95) 54%, 
-        var(--subject-color) 54%, var(--subject-color) 57%, 
-        rgba(30, 30, 42, 0.95) 57%
-    );
-}
-
-/* For full cards (all weeks), we add a single diagonal dark stripe */
-.class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
+/* ── Terminal easter egg ──────────────────────────────────────────────── */
+[data-theme='terminal'] .class-card::after {
     content: "";
-    position: absolute; top:0; left:0; right:0; bottom:0;
-    pointer-events: none; border-radius: inherit; z-index: -1;
-    background: linear-gradient(-45deg,
-        transparent 47%,
-        rgba(30, 30, 42, 0.95) 47%, rgba(30, 30, 42, 0.95) 51%,
-        transparent 51%
-    );
-}
-
-/* Faulty terminal overrides for customized indicators */
-[data-theme='terminal'] .class-card--dropdown.is-odd-week.is-custom::before {
-    background: linear-gradient(-45deg, 
-        var(--bg-primary, #050505) 43%, 
-        var(--subject-color) 43%, var(--subject-color) 46%, 
-        var(--bg-primary, #050505) 46%, var(--bg-primary, #050505) 50%, 
-        transparent 50%
-    );
-}
-
-[data-theme='terminal'] .class-card--dropdown.is-even-week.is-custom::before {
-    background: linear-gradient(-45deg, 
-        transparent 50%, 
-        var(--bg-primary, #050505) 50%, var(--bg-primary, #050505) 54%, 
-        var(--subject-color) 54%, var(--subject-color) 57%, 
-        var(--bg-primary, #050505) 57%
-    );
-}
-
-[data-theme='terminal'] .class-card--dropdown.is-custom:not(.is-odd-week):not(.is-even-week)::before {
-    background: linear-gradient(-45deg,
-        transparent 47%,
-        var(--bg-primary, #050505) 47%, var(--bg-primary, #050505) 51%,
-        transparent 51%
-    );
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%,
+            rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg,
+            rgba(255, 0, 0, 0.06),
+            rgba(0, 255, 0, 0.02),
+            rgba(0, 0, 255, 0.06));
+    z-index: 2;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
 }

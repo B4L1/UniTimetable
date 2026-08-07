@@ -14,10 +14,13 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import ImportSubjectModal from './components/ImportSubjectModal';
 import Dock, { type DockItemData } from './components/Dock';
 import MobileMenu from './components/MobileMenu';
+import ToastHost from './components/Toast';
+import ConfirmDialog from './components/ConfirmDialog';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { formatClassName } from './utils/format';
 import { toggleLightDark, isLightTheme } from './utils/theme';
 import { setSubjectPalette, assignSubjectColors } from '@shared/index';
+import { countTo } from './motion';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import Onboarding from './components/Onboarding';
@@ -92,6 +95,17 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const CalendarExportIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+    <path d="M12 14v6" />
+    <polyline points="9 17 12 20 15 17" />
+  </svg>
+);
+
 const SparklesIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 3l1.9 5.7L19.5 10l-5.6 1.3L12 17l-1.9-5.7L4.5 10l5.6-1.3L12 3z" />
@@ -123,6 +137,7 @@ function App() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const plannerSaveRef = useRef<(() => void) | null>(null);
   const timetableExportRef = useRef<(() => Promise<void>) | null>(null);
+  const timetableExportIcsRef = useRef<(() => void) | null>(null);
 
   // Derive active tab from pathname
   const activeTab: Tab = useMemo(() => {
@@ -172,44 +187,52 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
-      <Route path="/onboarding" element={user && !user.selectionId ? <Onboarding /> : <Navigate to="/" />} />
-      <Route
-        path="*"
-        element={
-          !user ? (
-            <Navigate to="/login" />
-          ) : !user.selectionId ? (
-            <Navigate to="/onboarding" />
-          ) : (
-            <MainAppLayout
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              preferences={preferences}
-              updatePreferences={updatePreferences}
-              selectedClass={selectedClass}
-              isFirstLaunch={isFirstLaunch}
-              selectionCount={selectionCount}
-              setSelectionCount={setSelectionCount}
-              plannerSearchQuery={plannerSearchQuery}
-              setPlannerSearchQuery={setPlannerSearchQuery}
-              includeCrossMajor={includeCrossMajor}
-              setIncludeCrossMajor={setIncludeCrossMajor}
-              isSaving={isSaving}
-              setIsSaving={setIsSaving}
-              isMobileMenuOpen={isMobileMenuOpen}
-              setIsMobileMenuOpen={setIsMobileMenuOpen}
-              showImportModal={showImportModal}
-              setShowImportModal={setShowImportModal}
-              isMobile={isMobile}
-              plannerSaveRef={plannerSaveRef}
-              timetableExportRef={timetableExportRef}
-            />
-          )
-        }
-      />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+        <Route path="/onboarding" element={user && !user.selectionId ? <Onboarding /> : <Navigate to="/" />} />
+        <Route
+          path="*"
+          element={
+            !user ? (
+              <Navigate to="/login" />
+            ) : !user.selectionId ? (
+              <Navigate to="/onboarding" />
+            ) : (
+              <MainAppLayout
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                preferences={preferences}
+                updatePreferences={updatePreferences}
+                selectedClass={selectedClass}
+                isFirstLaunch={isFirstLaunch}
+                selectionCount={selectionCount}
+                setSelectionCount={setSelectionCount}
+                plannerSearchQuery={plannerSearchQuery}
+                setPlannerSearchQuery={setPlannerSearchQuery}
+                includeCrossMajor={includeCrossMajor}
+                setIncludeCrossMajor={setIncludeCrossMajor}
+                isSaving={isSaving}
+                setIsSaving={setIsSaving}
+                isMobileMenuOpen={isMobileMenuOpen}
+                setIsMobileMenuOpen={setIsMobileMenuOpen}
+                showImportModal={showImportModal}
+                setShowImportModal={setShowImportModal}
+                isMobile={isMobile}
+                plannerSaveRef={plannerSaveRef}
+                timetableExportRef={timetableExportRef}
+                timetableExportIcsRef={timetableExportIcsRef}
+              />
+            )
+          }
+        />
+      </Routes>
+      {/* Mounted once, above every route, so any component can call
+          showToast()/confirmDialog() without being a child of whatever used
+          to own that UI (see stores/toastStore.ts, stores/confirmStore.ts). */}
+      <ToastHost />
+      <ConfirmDialog />
+    </>
   );
 }
 
@@ -235,6 +258,7 @@ interface MainLayoutProps {
   isMobile: boolean;
   plannerSaveRef: React.MutableRefObject<(() => void) | null>;
   timetableExportRef: React.MutableRefObject<(() => Promise<void>) | null>;
+  timetableExportIcsRef: React.MutableRefObject<(() => void) | null>;
 }
 
 function MainAppLayout({
@@ -242,8 +266,21 @@ function MainAppLayout({
   isFirstLaunch, selectionCount, setSelectionCount, plannerSearchQuery,
   setPlannerSearchQuery, includeCrossMajor, setIncludeCrossMajor,
   isSaving, setIsSaving, isMobileMenuOpen, setIsMobileMenuOpen,
-  showImportModal, setShowImportModal, isMobile, plannerSaveRef, timetableExportRef
+  showImportModal, setShowImportModal, isMobile, plannerSaveRef, timetableExportRef,
+  timetableExportIcsRef,
 }: MainLayoutProps) {
+
+  /**
+   * The planner's "N óra" count tweens rather than snapping.
+   *
+   * This is the one thing in the app that anime.js does and neither CSS nor
+   * motion/react can: tween a plain number and write it into a text node.
+   * countTo() no-ops for deltas under 3, so adding a single class doesn't
+   * trigger a pointless roll — only bulk changes (loading a saved plan,
+   * generating one) actually animate.
+   */
+  const countRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => countTo(countRef.current, selectionCount), [selectionCount]);
 
   const handleSave = () => {
     if (plannerSaveRef.current) {
@@ -254,6 +291,12 @@ function MainAppLayout({
   const handleExportImage = () => {
     if (timetableExportRef.current) {
       timetableExportRef.current();
+    }
+  };
+
+  const handleExportIcs = () => {
+    if (timetableExportIcsRef.current) {
+      timetableExportIcsRef.current();
     }
   };
 
@@ -299,6 +342,7 @@ function MainAppLayout({
     tabSpecificItems.push(
       { id: 'time-indicator', icon: <ClockIcon />, label: 'Idő jelző', onClick: () => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator }), active: preferences.showTimeIndicator, variant: 'toggle' } as DockItemData,
       { id: 'export-image', icon: <DownloadIcon />, label: 'Exportálás képként', onClick: handleExportImage } as DockItemData,
+      { id: 'export-ics', icon: <CalendarExportIcon />, label: 'Exportálás naptárba (.ics)', onClick: handleExportIcs } as DockItemData,
     );
   }
   if (activeTab === 'planner') {
@@ -336,7 +380,7 @@ function MainAppLayout({
       <BackgroundSelector />
 
       {/* Header */}
-      <header className="app-header glass-header">
+      <header className="app-header panel-header">
         <div className="header-left">
           <h1>📅 UniTimetable</h1>
           {selectedClass && (
@@ -346,7 +390,9 @@ function MainAppLayout({
               </span>
               {activeTab === 'planner' && selectionCount > 0 && !isMobile && (
                 <span className="count-badge">
-                  {selectionCount} óra
+                  {/* The number is tweened by anime.js (see the effect above);
+                      React only renders the initial value and the unit. */}
+                  <span ref={countRef}>{selectionCount}</span> óra
                 </span>
               )}
             </div>
@@ -384,47 +430,17 @@ function MainAppLayout({
                   value={plannerSearchQuery}
                   onChange={(e) => setPlannerSearchQuery(e.target.value)}
                   placeholder="Típus keresés..."
-                  style={{
-                    minWidth: '140px',
-                    maxWidth: '200px',
-                    width: '14vw',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-secondary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem',
-                    outline: 'none',
-                    height: '42px', // Match Dock item size
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
                 />
-                <label className="planner-search-label" style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  background: 'rgba(26, 26, 36, 0.6)',
-                  padding: '0 12px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  height: '42px', // Match Dock item size
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(40, 40, 50, 0.8)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(26, 26, 36, 0.6)'}
-                >
+                {/* Hover/focus styling lives in index.css now — the inline
+                    onMouseEnter/Leave handlers it replaces couldn't respond to
+                    the theme and hardcoded the old dark surface colours. */}
+                <label className="planner-search-label">
                   <input
                     type="checkbox"
                     checked={includeCrossMajor}
                     onChange={(e) => setIncludeCrossMajor(e.target.checked)}
-                    style={{ accentColor: 'var(--accent)', width: '14px', height: '14px' }}
                   />
-                  <span style={{ whiteSpace: 'nowrap' }}>Bővített</span>
+                  <span>Bővített</span>
                 </label>
               </>
             )}
@@ -445,7 +461,7 @@ function MainAppLayout({
       {/* Content — the timetable route is hard no-scroll (spec §2.1).
           The wizard renders as a modal OVER the timetable, so both mount. */}
       <main className={`app-content${activeTab === 'timetable' || activeTab === 'wizard' ? ' app-content--fixed' : ''}`}>
-        {(activeTab === 'timetable' || activeTab === 'wizard') && <Timetable onExportRef={timetableExportRef} />}
+        {(activeTab === 'timetable' || activeTab === 'wizard') && <Timetable onExportRef={timetableExportRef} onExportIcsRef={timetableExportIcsRef} />}
         {activeTab === 'planner' && (
           <Planner
             onSaveRef={plannerSaveRef}

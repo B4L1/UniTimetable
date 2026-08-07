@@ -13,6 +13,7 @@ import {
 } from '@shared/index';
 import { useAppStore } from '../../stores/appStore';
 import { useWizardStore, WIZARD_STEPS, WizardStep } from './wizardStore';
+import { canAdvanceFromStep } from './navigation';
 import StepProfile from './StepProfile';
 import StepCourses from './StepCourses';
 import StepPreferences from './StepPreferences';
@@ -23,7 +24,7 @@ import './PlannerWizard.css';
 export default function PlannerWizard() {
     const navigate = useNavigate();
     const { selectedClass, importedSubjects, customEntries, user } = useAppStore();
-    const { step, setStep, crossMajor, courseSettings, setEventPrefs } = useWizardStore();
+    const { step, setStep, crossMajor, courseSettings, setEventPrefs, pickedEventIds } = useWizardStore();
 
     const close = () => navigate('/');
 
@@ -97,15 +98,13 @@ export default function PlannerWizard() {
         return keys.size;
     }, [effectivePool]);
 
-    const canAdvanceFrom = (s: WizardStep): boolean => {
-        if (s === 0) return !!selectedClass;
-        if (s === 1) {
-            // at least one course still included
-            return includedCourseCount > 0 &&
-                Object.values(courseSettings).filter(c => !c.included).length < includedCourseCount;
-        }
-        return true;
-    };
+    const canAdvanceFrom = (s: WizardStep): boolean =>
+        canAdvanceFromStep(s, {
+            hasSelectedClass: !!selectedClass,
+            includedCourseCount,
+            courseSettings,
+            pickedEventIds,
+        });
 
     const goTo = (target: WizardStep) => {
         if (target > step && !canAdvanceFrom(step)) return;

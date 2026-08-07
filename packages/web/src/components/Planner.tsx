@@ -4,31 +4,15 @@ import { useState, useEffect, useMemo, useRef, useCallback, type RefObject } fro
 import { AnimatePresence, motion } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
 import { webStorage } from '../stores/webStorage';
+import { alertDialog } from '../stores/confirmStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { fetchAvailableClassesForPlanner, fetchTimetableEntries, assignSubjectColors } from '@shared/index';
+import {
+    fetchAvailableClassesForPlanner, fetchTimetableEntries, assignSubjectColors,
+    TIME_SLOTS, DAY_NAMES, timeToMinutes as getMinutes,
+} from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
-import GlareHover from './GlareHover';
 import AnimatedList from './AnimatedList';
 import ClassCard from './ClassCard';
-
-// 2-hour time slots
-const TIME_SLOTS = [
-    { label: '1-2', start: '08:00', end: '09:50' },
-    { label: '3-4', start: '10:00', end: '11:50' },
-    { label: '5-6', start: '12:30', end: '14:20' },
-    { label: '7-8', start: '14:30', end: '16:20' },
-    { label: '9-10', start: '16:30', end: '18:20' },
-    { label: '11-12', start: '18:30', end: '20:20' },
-];
-
-const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
-
-// Helper to get minutes from "HH:MM"
-function getMinutes(timeStr: string): number {
-    if (!timeStr) return 0;
-    const [h, m] = timeStr.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
-}
 
 // Check if an entry overlaps with a slot
 function isEntryInSlot(entryStartTime: string, entryEndTime: string, slotIndex: number): boolean {
@@ -72,17 +56,32 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     } | null>(null);
     const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Szombat only joins the grid when the student's actual available-classes
+    // pool has something scheduled on it — same rule Timetable.tsx uses, so a
+    // curriculum with Saturday offerings isn't silently unselectable here.
+    const hasSaturday = useMemo(
+        () => [...availableClasses.keys()].some(key => key.startsWith('5-')),
+        [availableClasses],
+    );
+    const DAYS = hasSaturday ? DAY_NAMES : DAY_NAMES.slice(0, 5);
+    const dayCount = DAYS.length;
+
     // Mobile Carousel State
     const today = new Date().getDay() - 1; // 0 = Monday
     const [currentDayIndex, setCurrentDayIndex] = useState(today >= 0 && today < 5 ? today : 0);
     const [direction, setDirection] = useState(0);
 
+    // If today is a Saturday with classes available, land on it once loaded.
+    useEffect(() => {
+        if (hasSaturday && today === 5) setCurrentDayIndex(5);
+    }, [hasSaturday, today]);
+
     const paginate = (newDirection: number) => {
         setDirection(newDirection);
         setCurrentDayIndex(prev => {
             const next = prev + newDirection;
-            if (next > 4) return 0;
-            if (next < 0) return 4;
+            if (next > dayCount - 1) return 0;
+            if (next < 0) return dayCount - 1;
             return next;
         });
     };
@@ -937,24 +936,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-                        className={`save-message-floating glass-card ${saveMessage.type}`}
-                        style={{
-                            position: 'fixed',
-                            bottom: '80px',
-                            left: '50%',
-                            translateX: '-50%',
-                            zIndex: 1000,
-                            padding: '12px 24px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                            border: '1px solid var(--border)',
-                            color: saveMessage.type === 'success' ? 'var(--success)' : 'var(--error)',
-                            background: 'var(--bg-secondary)',
-                            backdropFilter: 'blur(12px)',
-                            borderRadius: 'var(--radius-lg)',
-                        }}
+                        className={`toast toast--${saveMessage.type}`}
                     >
                         {saveMessage.type === 'success' ? '✅' : '❌'} {saveMessage.text}
                     </motion.div>
@@ -970,45 +952,14 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-                        style={{
-                            position: 'fixed',
-                            bottom: saveMessage ? '140px' : '80px',
-                            left: '50%',
-                            translateX: '-50%',
-                            zIndex: 1001,
-                            padding: '10px 12px 10px 18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '14px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
-                            border: '1px solid var(--border)',
-                            background: 'var(--bg-card)',
-                            backdropFilter: 'blur(12px)',
-                            borderRadius: 'var(--radius-lg)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.875rem',
-                            whiteSpace: 'nowrap',
-                        }}
+                        className="toast toast--undo"
+                        // Stack above the save toast when both are on screen.
+                        style={{ bottom: saveMessage ? '132px' : '76px' }}
                     >
-                        <span style={{ color: 'var(--text-secondary)' }}>
-                            Törölve: <strong style={{ color: 'var(--text-primary)' }}>{undoState.label}</strong>
+                        <span className="toast-text">
+                            Törölve: <strong>{undoState.label}</strong>
                         </span>
-                        <button
-                            onClick={handleUndo}
-                            style={{
-                                background: 'var(--accent)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 'var(--radius-sm)',
-                                padding: '5px 14px',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                transition: 'background 0.15s ease',
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
-                        >
+                        <button className="btn btn-primary toast-action" onClick={handleUndo}>
                             Visszavonás
                         </button>
                     </motion.div>
@@ -1036,13 +987,17 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                     display: isMobile ? 'flex' : 'grid',
                     flexDirection: isMobile ? 'column' : undefined,
                     gridTemplateColumns: isMobile ? undefined : `80px repeat(${DAYS.length}, 1fr)`,
+                    // Rows default to `auto` (sized to content) without this, so the
+                    // grid only ever grows as tall as its content and leaves the rest
+                    // of the flex space empty below it — same fix Timetable.tsx uses.
+                    gridTemplateRows: isMobile ? undefined : `auto repeat(${TIME_SLOTS.length}, minmax(0, 1fr))`,
                     gap: isMobile ? '32px' : '4px',
-                    height: isMobile ? '100%' : undefined
+                    height: '100%'
                 }}>
                     {!isMobile && (
                         <>
                             {/* Corner cell */}
-                            <div className="glass-card" style={{ padding: '12px', textAlign: 'center' }}>
+                            <div className="panel" style={{ padding: '12px', textAlign: 'center' }}>
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
                                     Időpont
                                 </span>
@@ -1052,8 +1007,8 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                             {DAYS.map((day, index) => (
                                 <div
                                     key={day}
-                                    className="day-header glass-card"
-                                    style={{ background: 'var(--bg-card)' }}
+                                    className="day-header panel"
+                                    style={{ background: 'var(--bg-surface)' }}
                                 >
                                     {day}
                                 </div>
@@ -1125,7 +1080,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                             }}
                                                             className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${(isSearchMatch && !hasSelection && !isCovered) ? 'search-match' : ''}`}
                                                             style={{
-                                                                background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
+                                                                background: hasSelection || isCovered ? 'transparent' : 'var(--grid-fill)',
                                                                 borderColor: isActive && !hasSelection && !isCovered
                                                                     ? 'var(--accent)'
                                                                     : undefined,
@@ -1211,7 +1166,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                         TIME_SLOTS.map((slot, slotIndex) => (
                             <div key={`row-${slotIndex}`} className="planner-row-group" style={{ display: 'contents' }}>
                                 {/* Time cell */}
-                                <div key={`time-${slotIndex}`} className="time-cell glass-card">
+                                <div key={`time-${slotIndex}`} className="time-cell panel">
                                     <span className="time-label">{slot.label}</span>
                                     <span className="time-range">{slot.start}</span>
                                     <span className="time-range">{slot.end}</span>
@@ -1235,7 +1190,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                             }}
                                             className={`planner-slot-cell ${isActive ? 'active' : ''} ${!isCovered && (hasOptions || hasSelection) ? 'clickable' : ''} ${hasSelection ? 'has-selection' : ''} ${isCovered ? 'is-covered' : ''} ${normalizedSearch ? 'search-active' : ''} ${(isSearchMatch && !hasSelection && !isCovered) ? 'search-match' : ''}`}
                                             style={{
-                                                background: hasSelection || isCovered ? 'transparent' : 'var(--bg-secondary)',
+                                                background: hasSelection || isCovered ? 'transparent' : 'var(--grid-fill)',
                                                 borderColor: isActive && !hasSelection && !isCovered
                                                     ? 'var(--accent)'
                                                     : undefined,
@@ -1359,30 +1314,27 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                 </div>
                                             </div>
                                         ) : (
-                                            <GlareHover
+                                            // Was a GlareHover. The white sweep across the button
+                                            // was a leftover from the glass look; hover state is now
+                                            // a surface + border change in index.css.
+                                            <button
                                                 key="settings-btn"
+                                                type="button"
                                                 className="planner-settings-btn"
                                                 onClick={(e) => {
-                                                    // @ts-ignore
                                                     e.stopPropagation();
                                                     const entries = getSelectedEntries(activeSlot!.day, activeSlot!.slot);
                                                     if (entries.length > 0) {
                                                         setModifyingEntry(entries[0]);
                                                     }
                                                 }}
-                                                glareColor="#ffffff"
-                                                glareOpacity={0.2}
-                                                glareSize={150}
-                                                height="auto"
-                                                borderRadius="var(--radius-sm)"
-                                                borderColor="var(--border)"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                     <circle cx="12" cy="12" r="3" />
                                                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                                                 </svg>
                                                 <span>Módosítás</span>
-                                            </GlareHover>
+                                            </button>
                                         )
                                     ] : []),
                                     ...dropdownOptions.map((item) => {
@@ -1410,7 +1362,6 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                     showRoom={true}
                                                     showClassName={true}
                                                     variant="dropdown"
-                                                    enableGlare={true}
                                                     isCustom={!!customEntries[entry.id]}
                                                 />
                                                 {entry.shared_classes && entry.shared_classes.length > 1 && (
@@ -1418,7 +1369,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                         className="shared-groups-btn"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            alert(`Ez az óra közös a következő csoportokkal:\n\n${entry.shared_classes!.join('\n')}`);
+                                                            alertDialog(`Ez az óra közös a következő csoportokkal:\n\n${entry.shared_classes!.join('\n')}`);
                                                         }}
                                                         title={`Közös óra ${entry.shared_classes.length} csoporttal`}
                                                     >
@@ -1429,24 +1380,16 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                         );
                                     }),
                                     ...(activeSlot && getSelectedEntries(activeSlot.day, activeSlot.slot).length > 0 ? [
-                                        <GlareHover
+                                        <button
                                             key="clear-btn"
-                                            background="rgba(239, 68, 68, 0.15)"
-                                            borderColor="rgba(239, 68, 68, 0.4)"
-                                            borderRadius="var(--radius-sm)"
-                                            glareColor="#ffffff"
-                                            glareOpacity={0.2}
-                                            glareAngle={-30}
-                                            glareSize={200}
-                                            transitionDuration={600}
-                                            playOnce={false}
+                                            type="button"
                                             className="dropdown-delete-btn"
                                             onClick={() => {
                                                 selectClass(null);
                                             }}
                                         >
                                             🗑️ Törlés
-                                        </GlareHover>
+                                        </button>
                                     ] : []),
                                     ...(dropdownOptions.length === 0 && activeSlot && getSelectedEntries(activeSlot.day, activeSlot.slot).length > 0 ? [
                                         <div key="empty-msg" className="dropdown-empty">

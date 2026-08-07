@@ -8,22 +8,17 @@
 
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion, PanInfo } from 'motion/react';
-import { AvailableClassEntry, getSubjectColor } from '@shared/index';
+import { AvailableClassEntry, getSubjectColor, TIME_SLOTS as SHARED_TIME_SLOTS } from '@shared/index';
 import { timeToMinutes } from '@shared/lib/generator';
 import { CourseSetting } from './wizardStore';
 import { buildEditorModel, EditableEvent } from './editorModel';
 
 const DAY_SHORT = ['Hétfő', 'Kedd', 'Szerda', 'Csüt.', 'Péntek', 'Szombat'];
 
-// The Sapientia 2-hour teaching slots (classes are slot-aligned).
-const TIME_SLOTS = [
-    { start: 8 * 60, label: '08:00' },
-    { start: 10 * 60, label: '10:00' },
-    { start: 12 * 60 + 30, label: '12:30' },
-    { start: 14 * 60 + 30, label: '14:30' },
-    { start: 16 * 60 + 30, label: '16:30' },
-    { start: 18 * 60 + 30, label: '18:30' },
-];
+// This grid only needs each slot's start minute and its "HH:MM" display
+// label — derived from the shared slot list (packages/shared/lib/schedule.ts)
+// rather than a separately hardcoded copy of the same six boundaries.
+const TIME_SLOTS = SHARED_TIME_SLOTS.map(s => ({ start: timeToMinutes(s.start), label: s.start }));
 
 function slotOf(startMin: number): number {
     for (let i = 0; i < TIME_SLOTS.length; i++) {
@@ -205,6 +200,38 @@ export default function ScheduleGrid({
                 {wl && <span className={`sg-week ${entry.week_type}`}>{wl}</span>}
                 {draggable && <span className="sg-grip" title="Húzható másik csoportra"><GripGlyph /></span>}
                 <div className="sg-card-actions" onPointerDown={e => e.stopPropagation()}>
+                    {draggable && (
+                        // Keyboard/screen-reader equivalent of the drag gesture above —
+                        // dragging only works with a mouse or touch, this doesn't. A
+                        // native <select> gets full keyboard operability (arrow keys,
+                        // type-ahead, Enter/Space, Escape) and screen-reader support for
+                        // free, so there's no custom ARIA listbox to get wrong. It always
+                        // shows "⇄" (never the choice you made) because choosing one
+                        // swaps it into the schedule immediately — this card's entry is
+                        // replaced, not this select's displayed value.
+                        <select
+                            className="sg-icon-btn sg-swap-select"
+                            aria-label={`${entry.subject_name} cseréje másik csoportra`}
+                            title="Csere másik csoportra"
+                            defaultValue=""
+                            onChange={e => {
+                                const alt = item.alternatives.find(a => a.option.id === e.target.value);
+                                if (!alt || alt.conflict) return;
+                                onSwapOption(
+                                    item.currentOption.events.map(ev => ev.id),
+                                    alt.option.events.map(ev => ev.id),
+                                );
+                                e.target.value = '';
+                            }}
+                        >
+                            <option value="" disabled>⇄</option>
+                            {item.alternatives.map(alt => (
+                                <option key={alt.option.id} value={alt.option.id} disabled={alt.conflict}>
+                                    {(alt.option.className ?? 'másik csoport') + (alt.conflict ? ' — ütközik' : '')}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                     <button
                         className={`sg-icon-btn${locked ? ' on' : ''}`}
                         aria-pressed={locked}

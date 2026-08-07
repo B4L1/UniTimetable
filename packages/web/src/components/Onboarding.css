@@ -70,14 +70,18 @@
     font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition);
+    transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
     margin-top: 10px;
 }
 
 .save-btn:hover:not(:disabled) {
     background: var(--accent-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: none;
+    box-shadow: none;
 }
 
 .save-btn:disabled {

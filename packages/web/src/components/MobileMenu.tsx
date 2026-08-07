@@ -35,7 +35,7 @@ export default function MobileMenu({ isOpen, onClose, items, footer }: MobileMen
 
                     {/* Drawer */}
                     <motion.div
-                        className="mobile-menu-drawer glass-card"
+                        className="mobile-menu-drawer panel"
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}

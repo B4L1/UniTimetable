@@ -33,11 +33,15 @@ body[data-theme='light'] .cdm-backdrop {
     border-bottom: 1px solid var(--border-subtle);
 }
 
+/* Matches the card accent bar rather than being a dot — the detail window is
+   the same object as the card the user just tapped, so it carries the same
+   mark. */
 .cdm-color-dot {
     flex-shrink: 0;
-    width: 10px;
-    height: 10px;
-    border-radius: var(--radius-pill);
+    width: 3px;
+    align-self: stretch;
+    min-height: 18px;
+    border-radius: 0;
     background: var(--subject-color);
 }
 

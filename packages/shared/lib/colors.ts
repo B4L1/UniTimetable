@@ -1,25 +1,78 @@
-// Muted color palette for timetable entries (spec v3 §4.3: muted tones,
-// consistent brightness, no neon). Shared by web, mobile app and widget so
-// the same subject renders the same color everywhere.
-// Each unique subject (base name) gets a unique color via deterministic assignment.
-
+// Subject colour palette. Shared by web, mobile app and widget so the same
+// subject renders the same colour everywhere. Each unique subject (base name)
+// gets a colour via deterministic hash assignment (see getSubjectColor).
+//
+// ── Why these values (v4 redesign) ──────────────────────────────────────
+// The old palette was deliberately muted because the colour WAS the card
+// background — anything saturated made the text on top unreadable, and the
+// price was 16 tints that were genuinely hard to tell apart.
+//
+// Cards are now neutral with a 3px accent bar (see ClassCard.css), so the
+// colour is a small graphic element rather than a text background. That
+// inverts the constraint: the palette should be as *distinguishable* as
+// possible, and only needs to clear non-text contrast against the surface.
+//
+// v4 went through two generations before this one, both of which produced
+// colours that were too easy to confuse for a different subject:
+//
+// 1. 24 evenly-spaced hues (15° apart) at one fixed lightness/chroma. Reads
+//    as "evenly spaced" but isn't: 24 points on one hue ring put adjacent
+//    colours only ~0.03 apart in OKLab, and several pairs (two different
+//    teals, two different ambers) were close enough to be mistaken for the
+//    same subject.
+// 2. Farthest-point sampling — greedily add whichever in-gamut candidate is
+//    farthest (in OKLab) from every colour already picked, which pushed the
+//    WORST pair in the whole set out to ~0.073. That guarantee turned out
+//    not to be the thing that mattered: the search packed 12 of the 24
+//    colours into a single 96°-wide blue→violet→magenta→pink arc (that hue
+//    range tolerates more distinguishable near-max-chroma steps at this
+//    lightness than oranges or greens do), because nothing constrained
+//    *where* the picks landed, only how far apart they were. A student with
+//    5 real subjects had a real chance of 3 of them landing in that one
+//    quadrant — which is exactly what happened.
+//
+// This version fixes the actual problem — unpredictable hue clustering —
+// by constraining hue directly: one colour per 15° sector, no exceptions,
+// so no two colours can ever be closer than 15° in hue by construction.
+// Lightness cycles through {0.55, 0.605, 0.66} across sectors as a second
+// separation axis (adjacent sectors always land on different lightness
+// values), which lifts the worst-case distance for two hue-neighbours well
+// above the old ring's baseline even in the unlucky case where a hash
+// assignment picks two adjacent sectors. Chroma is ~97% of each hue's
+// in-gamut max at its lightness, so saturation stays consistently vivid.
+// Guaranteed minimum pairwise OKLab distance: 0.0597 (vs. ~0.029 for
+// generation 1) — see colors.test.ts. Contrast against the card surface
+// clears both themes (≥3.4:1 dark, ≥2.9:1 light).
+//
+// The list order is a stride-11 walk over the 24 hue sectors (coprime with
+// 24, so consecutive array entries sit ~165° apart) — carried over from
+// generation 1 for the same reason: assignColor() probes forward linearly
+// on a hash collision, and this keeps probe-adjacent entries far apart too.
 export const DEFAULT_SUBJECT_COLORS = [
-    '#719EB5', // Muted Blue
-    '#7CA193', // Sage Green
-    '#C66953', // Terracotta
-    '#968DCA', // Soft Purple
-    '#E99F79', // Peach
-    '#89B4B4', // Dusty Teal
-    '#C48696', // Dusty Rose
-    '#D0A55D', // Muted Gold
-    '#92A374', // Faded Olive
-    '#7D8DAB', // Dusty Indigo
-    '#B49082', // Warm Taupe
-    '#8FA4C2', // Periwinkle
-    '#A88BB8', // Faded Lilac
-    '#6FA287', // Eucalyptus
-    '#C79A83', // Clay
-    '#849BB0', // Slate Blue
+    '#CB116C',
+    '#16AB7D',
+    '#D115CB',
+    '#45840C',
+    '#A86BFC',
+    '#8D850F',
+    '#4158FB',
+    '#C28412',
+    '#118AC9',
+    '#B64D0B',
+    '#16A4B7',
+    '#EC1552',
+    '#0F8474',
+    '#F918B7',
+    '#129B49',
+    '#A812D7',
+    '#879F13',
+    '#7B63FB',
+    '#8A6E0C',
+    '#3992FC',
+    '#BC6A0F',
+    '#0E7D9E',
+    '#FC4734',
+    '#129494',
 ];
 
 let activePalette = [...DEFAULT_SUBJECT_COLORS];
