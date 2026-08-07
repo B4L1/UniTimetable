@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Select from 'react-select';
+import Select, { type StylesConfig } from 'react-select';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
 import { fetchClasses, getUniqueFaculties, getYearsForFaculty, getGroupsForFacultyYear, findClass, fetchTeachers, fetchUserPreferences, fetchClassById } from '@shared/index';
@@ -19,7 +19,7 @@ const Onboarding: React.FC = () => {
     const [selectedFaculty, setSelectedFaculty] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number | null>(null);
     const [selectedGroup, setSelectedGroup] = useState<string>('');
-    const [isAutoLoading, setIsAutoLoading] = useState(true);
+    const [, setIsAutoLoading] = useState(true);
 
     useEffect(() => {
         let isCancelled = false;
@@ -133,8 +133,8 @@ const Onboarding: React.FC = () => {
         navigate('/');
     };
 
-    const customStyles = {
-        control: (base: any) => ({
+    const customStyles: StylesConfig<{ value: string; label: string }, false> = {
+        control: (base) => ({
             ...base,
             background: 'var(--bg-secondary)',
             borderColor: 'var(--border)',
@@ -144,12 +144,12 @@ const Onboarding: React.FC = () => {
                 borderColor: 'var(--accent)'
             }
         }),
-        menu: (base: any) => ({
+        menu: (base) => ({
             ...base,
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)'
         }),
-        option: (base: any, state: any) => ({
+        option: (base, state) => ({
             ...base,
             background: state.isSelected ? 'var(--accent)' : state.isFocused ? 'var(--bg-alt)' : 'transparent',
             color: state.isSelected ? '#fff' : 'var(--text-primary)',
@@ -157,11 +157,11 @@ const Onboarding: React.FC = () => {
                 background: 'var(--accent)'
             }
         }),
-        singleValue: (base: any) => ({
+        singleValue: (base) => ({
             ...base,
             color: 'var(--text-primary)'
         }),
-        input: (base: any) => ({
+        input: (base) => ({
             ...base,
             color: 'var(--text-primary)'
         })
@@ -233,7 +233,7 @@ const Onboarding: React.FC = () => {
                             <label>Keresd meg a nevedet</label>
                             <Select
                                 options={teacherOptions}
-                                onChange={(opt: any) => setSelection(opt?.value || '')}
+                                onChange={(opt) => setSelection(opt?.value || '')}
                                 placeholder="Kezdd el gépelni a neved..."
                                 isSearchable
                                 styles={customStyles}

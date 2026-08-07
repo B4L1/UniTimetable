@@ -1,6 +1,16 @@
 // Web storage implementation using localStorage
 
 import type { IStorage, ClassInfo, TimetableEntry, Preferences } from '@shared/lib/types';
+import type { AvailableClassEntry } from '@shared/lib/api';
+
+export interface AppUser {
+    email: string;
+    name: string;
+    picture: string;
+    role: 'student' | 'teacher';
+    googleId: string;
+    selectionId?: string;
+}
 
 const KEYS = {
     FIRST_LAUNCH: 'unitimetable_first_launch',
@@ -28,13 +38,13 @@ export const webStorage: IStorage & {
     setRemovedSubjects: (subjects: string[]) => Promise<void>,
     getCustomEntries: () => Promise<Record<string, { week_type?: 'all' | 'odd' | 'even' }>>,
     setCustomEntries: (entries: Record<string, { week_type?: 'all' | 'odd' | 'even' }>) => Promise<void>,
-    getUser: () => Promise<any | null>,
-    setUser: (user: any) => Promise<void>,
+    getUser: () => Promise<AppUser | null>,
+    setUser: (user: AppUser | null) => Promise<void>,
     clearUser: () => Promise<void>,
     getSelectedTeacher: () => Promise<{ id: string, name: string } | null>,
     setSelectedTeacher: (teacher: { id: string, name: string }) => Promise<void>,
-    getSelectedEntriesCache: () => Promise<any[] | null>,
-    setSelectedEntriesCache: (entries: any[]) => Promise<void>
+    getSelectedEntriesCache: () => Promise<AvailableClassEntry[] | null>,
+    setSelectedEntriesCache: (entries: AvailableClassEntry[]) => Promise<void>
 } = {
     async isFirstLaunch(): Promise<boolean> {
         const value = localStorage.getItem(KEYS.FIRST_LAUNCH);
@@ -134,12 +144,12 @@ export const webStorage: IStorage & {
         localStorage.setItem(KEYS.CUSTOM_ENTRIES, JSON.stringify(entries));
     },
 
-    async getUser(): Promise<any | null> {
+    async getUser(): Promise<AppUser | null> {
         const value = localStorage.getItem(KEYS.USER);
         return value ? JSON.parse(value) : null;
     },
 
-    async setUser(user: any): Promise<void> {
+    async setUser(user: AppUser | null): Promise<void> {
         localStorage.setItem(KEYS.USER, JSON.stringify(user));
     },
 
@@ -156,12 +166,12 @@ export const webStorage: IStorage & {
         localStorage.setItem(KEYS.SELECTED_TEACHER, JSON.stringify(teacher));
     },
 
-    async getSelectedEntriesCache(): Promise<any[] | null> {
+    async getSelectedEntriesCache(): Promise<AvailableClassEntry[] | null> {
         const value = localStorage.getItem(KEYS.SELECTED_ENTRIES_CACHE);
         return value ? JSON.parse(value) : null;
     },
 
-    async setSelectedEntriesCache(entries: any[]): Promise<void> {
+    async setSelectedEntriesCache(entries: AvailableClassEntry[]): Promise<void> {
         localStorage.setItem(KEYS.SELECTED_ENTRIES_CACHE, JSON.stringify(entries));
     }
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
+import { useGoogleLogin, type TokenResponse } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
 import { fetchUserPreferences } from '@shared/index';
@@ -57,7 +57,7 @@ const Login: React.FC = () => {
     const toggleTheme = () => toggleLightDark(preferences.colorTheme, updatePreferences);
 
     const handleLogin = useGoogleLogin({
-        onSuccess: async (tokenResponse: any) => {
+        onSuccess: async (tokenResponse: Omit<TokenResponse, 'error' | 'error_description' | 'error_uri'>) => {
             setIsAuthenticating(true);
             try {
                 // Fetch user info using the access token
@@ -102,7 +102,7 @@ const Login: React.FC = () => {
                 setIsAuthenticating(false);
             }
         },
-        onError: (error: any) => {
+        onError: (error: Pick<TokenResponse, 'error' | 'error_description' | 'error_uri'>) => {
             console.log('Login Failed:', error);
             setIsAuthenticating(false);
         },

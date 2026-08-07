@@ -20,6 +20,7 @@ import { useMediaQuery } from './hooks/useMediaQuery';
 import { formatClassName } from './utils/format';
 import { toggleLightDark, isLightTheme } from './utils/theme';
 import { setSubjectPalette, assignSubjectColors } from '@shared/index';
+import type { Preferences, ClassInfo } from '@shared/lib/types';
 import { countTo } from './motion';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
@@ -239,9 +240,9 @@ function App() {
 interface MainLayoutProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
-  preferences: any;
-  updatePreferences: (prefs: any) => void;
-  selectedClass: any;
+  preferences: Preferences;
+  updatePreferences: (prefs: Partial<Preferences>) => void;
+  selectedClass: ClassInfo | null;
   isFirstLaunch: boolean;
   selectionCount: number;
   setSelectionCount: (n: number) => void;
@@ -341,7 +342,9 @@ function MainAppLayout({
   if (activeTab === 'timetable') {
     tabSpecificItems.push(
       { id: 'time-indicator', icon: <ClockIcon />, label: 'Idő jelző', onClick: () => updatePreferences({ showTimeIndicator: !preferences.showTimeIndicator }), active: preferences.showTimeIndicator, variant: 'toggle' } as DockItemData,
+      // eslint-disable-next-line react-hooks/refs -- Dock only calls item.onClick from its own onClick prop (Dock.tsx), never during render.
       { id: 'export-image', icon: <DownloadIcon />, label: 'Exportálás képként', onClick: handleExportImage } as DockItemData,
+      // eslint-disable-next-line react-hooks/refs -- same as above.
       { id: 'export-ics', icon: <CalendarExportIcon />, label: 'Exportálás naptárba (.ics)', onClick: handleExportIcs } as DockItemData,
     );
   }
@@ -362,6 +365,7 @@ function MainAppLayout({
         onClick: () => setShowImportModal(true),
         className: 'manage-subjects-btn',
       },
+      // eslint-disable-next-line react-hooks/refs -- Dock only calls item.onClick from its own onClick prop (Dock.tsx), never during render.
       {
         id: 'save',
         icon: <SaveIcon />,

@@ -1,17 +1,16 @@
 // Timetable component for web
 
-import { useEffect, useMemo, useState, useRef, useCallback, Fragment } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../stores/appStore';
 import { webStorage } from '../stores/webStorage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import {
     fetchTimetableEntries, fetchTimetableEntriesByIds, fetchTeacherTimetable, assignSubjectColors,
-    TIME_SLOTS, DAY_NAMES, computeSlotSpan, timeToMinutes as getMinutes, generateICS,
+    TIME_SLOTS, DAY_NAMES, computeSlotSpan, timeToMinutes as getMinutes, generateICS, getAcademicWeek,
 } from '@shared/index';
 import { showToast } from '../stores/toastStore';
 import type { AvailableClassEntry } from '@shared/lib/api';
-import type { TimetableEntry } from '@shared/lib/types';
 import ClassCard from './ClassCard';
 import ClassDetailModal from './ClassDetailModal';
 import { revealGrid } from '../motion';
@@ -19,8 +18,6 @@ import { revealGrid } from '../motion';
 // Saturday (index 5) exists in edupage data for some programs; the grid only
 // shows it when the displayed timetable actually has a Saturday class.
 const DAYS = DAY_NAMES;
-
-import { getAcademicWeek } from '../utils/calendar';
 
 interface TimetableProps {
     onExportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
@@ -174,9 +171,6 @@ export default function Timetable({ onExportRef, onExportIcsRef }: TimetableProp
         if (userSelections.length === 0) {
             return timetableEntries;
         }
-
-        // 1. Start with user selections (imports + planner choices)
-        const entries = [...userSelectedEntries];
 
         // 2. Add original entries ONLY if there's no conflict in that slot
         // However, if the user has confirmed selections in the planner, usually that implies
@@ -391,13 +385,14 @@ export default function Timetable({ onExportRef, onExportIcsRef }: TimetableProp
                         {/* Render Classes */}
                         {(() => {
                             const grouped = new Map<string, AvailableClassEntry[]>();
+                            const spanByEntry = new Map<AvailableClassEntry, number>();
                             filteredEntries.forEach(entry => {
                                 if (entry.day_of_week === undefined) return;
 
                                 const slotSpan = computeSlotSpan(entry.start_time, entry.end_time);
                                 if (!slotSpan) return;
                                 const { startSlot, span } = slotSpan;
-                                (entry as any)._calculatedSpan = span;
+                                spanByEntry.set(entry, span);
 
                                 const key = `${entry.day_of_week}-${startSlot}`;
                                 if (!grouped.has(key)) grouped.set(key, []);
@@ -406,7 +401,7 @@ export default function Timetable({ onExportRef, onExportIcsRef }: TimetableProp
 
                             return Array.from(grouped.entries()).map(([key, groupEntries]) => {
                                 const [day, startSlot] = key.split('-').map(Number);
-                                const maxSpan = Math.max(...groupEntries.map(e => (e as any)._calculatedSpan));
+                                const maxSpan = Math.max(...groupEntries.map(e => spanByEntry.get(e) ?? 1));
 
                                 return (
                                     <div
@@ -495,7 +490,7 @@ export default function Timetable({ onExportRef, onExportIcsRef }: TimetableProp
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={1}
-                    onDragEnd={(e, { offset, velocity }) => {
+                    onDragEnd={(e, { offset }) => {
                         const swipe = Math.abs(offset.x) > 50;
                         if (swipe) {
                             if (offset.x > 0) {
@@ -556,19 +551,20 @@ export default function Timetable({ onExportRef, onExportIcsRef }: TimetableProp
                             {(() => {
                                 const dayEntries = filteredEntries.filter(e => e.day_of_week === currentDayIndex);
                                 const grouped = new Map<number, AvailableClassEntry[]>();
+                                const spanByEntry = new Map<AvailableClassEntry, number>();
 
                                 dayEntries.forEach(entry => {
                                     const slotSpan = computeSlotSpan(entry.start_time, entry.end_time);
                                     if (!slotSpan) return;
                                     const { startSlot, span } = slotSpan;
-                                    (entry as any)._calculatedSpan = span;
+                                    spanByEntry.set(entry, span);
 
                                     if (!grouped.has(startSlot)) grouped.set(startSlot, []);
                                     grouped.get(startSlot)!.push(entry);
                                 });
 
                                 return Array.from(grouped.entries()).map(([startSlot, groupEntries]) => {
-                                    const maxSpan = Math.max(...groupEntries.map(e => (e as any)._calculatedSpan));
+                                    const maxSpan = Math.max(...groupEntries.map(e => spanByEntry.get(e) ?? 1));
                                     return (
                                         <div
                                             key={`mobile-group-${currentDayIndex}-${startSlot}`}
@@ -667,13 +663,9 @@ function TimeLine({ show, currentTime }: { show: boolean; currentTime: Date }) {
         return 100;
     };
 
-    const [currentPos, setCurrentPos] = useState(getPosition());
+    const currentPos = useMemo(() => getPosition(), [currentTime]);
     const [instanceKey, setInstanceKey] = useState(0);
     const [prevShow, setPrevShow] = useState(show);
-
-    useEffect(() => {
-        setCurrentPos(getPosition());
-    }, [currentTime]);
 
     // Track toggles to generate a new key when toggled ON
     // This allows the exiting animation to finish going DOWN,

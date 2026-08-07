@@ -54,7 +54,11 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
 }) => {
     const listRef = useRef<HTMLDivElement>(null);
     const [selectedIndex, setSelectedIndex] = useState<number>(initialSelectedIndex);
-    const [keyboardNav, setKeyboardNav] = useState<boolean>(false);
+    // Gates the scroll-into-view effect below to keyboard-driven selection
+    // changes only (mouse hover also moves selectedIndex but shouldn't
+    // scroll). A ref, not state, because it's consumed inside the effect
+    // and never read during render.
+    const keyboardNavRef = useRef<boolean>(false);
     const [topGradientOpacity, setTopGradientOpacity] = useState<number>(0);
     const [bottomGradientOpacity, setBottomGradientOpacity] = useState<number>(1);
 
@@ -85,11 +89,11 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
                 e.preventDefault();
-                setKeyboardNav(true);
+                keyboardNavRef.current = true;
                 setSelectedIndex(prev => Math.min(prev + 1, items.length - 1));
             } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
                 e.preventDefault();
-                setKeyboardNav(true);
+                keyboardNavRef.current = true;
                 setSelectedIndex(prev => Math.max(prev - 1, 0));
             } else if (e.key === 'Enter') {
                 if (selectedIndex >= 0 && selectedIndex < items.length) {
@@ -106,7 +110,7 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
     }, [items, selectedIndex, onItemSelect, enableArrowNavigation]);
 
     useEffect(() => {
-        if (!keyboardNav || selectedIndex < 0 || !listRef.current) return;
+        if (!keyboardNavRef.current || selectedIndex < 0 || !listRef.current) return;
         const container = listRef.current;
         const selectedItem = container.querySelector(`[data-index="${selectedIndex}"]`) as HTMLElement | null;
         if (selectedItem) {
@@ -124,8 +128,8 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
                 });
             }
         }
-        setKeyboardNav(false);
-    }, [selectedIndex, keyboardNav]);
+        keyboardNavRef.current = false;
+    }, [selectedIndex]);
 
     return (
         <div className={`animated-list-container ${className}`}>

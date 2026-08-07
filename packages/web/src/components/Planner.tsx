@@ -11,8 +11,26 @@ import {
     TIME_SLOTS, DAY_NAMES, timeToMinutes as getMinutes,
 } from '@shared/index';
 import type { AvailableClassEntry } from '@shared/lib/api';
+import type { TimetableEntry } from '@shared/lib/types';
 import AnimatedList from './AnimatedList';
 import ClassCard from './ClassCard';
+
+// The v3 dual-read adapter (api.ts) normalizes rows to snake_case, but
+// entries cached in localStorage before that migration may still carry the
+// old camelCase field names. These getters check both without widening the
+// entry to `any`.
+type LegacyEntryFields = Partial<{
+    startTime: string;
+    endTime: string;
+    dayOfWeek: number;
+    subjectName: string;
+    weekType: string;
+    teacherName: string;
+    className: string;
+}>;
+function withLegacyFields<T extends TimetableEntry>(entry: T): T & LegacyEntryFields {
+    return entry as T & LegacyEntryFields;
+}
 
 // Check if an entry overlaps with a slot
 function isEntryInSlot(entryStartTime: string, entryEndTime: string, slotIndex: number): boolean {
@@ -207,12 +225,10 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     // Expose save function to parent via ref
     useEffect(() => {
         if (onSaveRef) {
-            // @ts-ignore
             onSaveRef.current = saveSelections;
         }
         return () => {
             if (onSaveRef) {
-                // @ts-ignore
                 onSaveRef.current = null;
             }
         };
@@ -296,8 +312,8 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                 // Prioritize class_name by similarity to user's class (selectedClass.name)
                                 const getSimilarity = (name: string) => {
                                     if (!selectedClass?.name) return 0;
-                                    const targetWords = name.toLowerCase().split(/[ .\-]/).filter(Boolean);
-                                    const userWords = selectedClass.name.toLowerCase().split(/[ .\-]/).filter(Boolean);
+                                    const targetWords = name.toLowerCase().split(/[ .-]/).filter(Boolean);
+                                    const userWords = selectedClass.name.toLowerCase().split(/[ .-]/).filter(Boolean);
                                     let score = 0;
                                     targetWords.forEach(w => {
                                         if (userWords.includes(w)) score++;
@@ -451,9 +467,9 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             // Re-build map for this scope WITH DEDUPLICATION
             const availableMap = new Map<string, AvailableClassEntry[]>();
             available.forEach((entry) => {
-                const time = (entry as any).startTime || entry.start_time;
-                const endTime = (entry as any).endTime || entry.end_time;
-                const dayIndex = (entry as any).dayOfWeek ?? entry.day_of_week;
+                const time = withLegacyFields(entry).startTime || entry.start_time;
+                const endTime = withLegacyFields(entry).endTime || entry.end_time;
+                const dayIndex = withLegacyFields(entry).dayOfWeek ?? entry.day_of_week;
 
                 if (dayIndex === undefined) return;
 
@@ -465,9 +481,9 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
 
                     // Deduplicate: If we already have a class with this name in this slot, skip it.
                     // This merges "Lecture (Group A)" and "Lecture (Group B)" if they have same subject name.
-                    const subjectName = (entry as any).subjectName || entry.subject_name;
+                    const subjectName = withLegacyFields(entry).subjectName || entry.subject_name;
                     if (!list.some(e => {
-                        const eKey = (e as any).subjectName || e.subject_name;
+                        const eKey = withLegacyFields(e).subjectName || e.subject_name;
                         return eKey === subjectName;
                     })) {
                         list.push(entry);
@@ -535,11 +551,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
             const newSelectedSlots = new Map<string, AvailableClassEntry[]>();
 
             defaults.forEach(entry => {
-                const time = (entry as any).startTime || entry.start_time;
-                const endTime = (entry as any).endTime || entry.end_time;
-                const dayIndex = (entry as any).dayOfWeek ?? entry.day_of_week;
-                const weekType = (entry as any).weekType ?? entry.week_type;
-                const subjectName = (entry as any).subjectName || entry.subject_name;
+                const time = withLegacyFields(entry).startTime || entry.start_time;
+                const endTime = withLegacyFields(entry).endTime || entry.end_time;
+                const dayIndex = withLegacyFields(entry).dayOfWeek ?? entry.day_of_week;
+                const weekType = withLegacyFields(entry).weekType ?? entry.week_type;
+                const subjectName = withLegacyFields(entry).subjectName || entry.subject_name;
 
                 if (dayIndex === undefined) return;
 
@@ -710,11 +726,11 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
     const isEntryMatch = useCallback((entry: AvailableClassEntry) => {
         if (!normalizedSearch) return false;
         const searchHaystack = [
-            entry.subject_name || (entry as any).subjectName,
-            entry.teacher_name || (entry as any).teacherName,
-            entry.classroom || (entry as any).classroom,
-            entry.class_name || (entry as any).className,
-            entry.week_type || (entry as any).weekType,
+            entry.subject_name || withLegacyFields(entry).subjectName,
+            entry.teacher_name || withLegacyFields(entry).teacherName,
+            entry.classroom,
+            entry.class_name || withLegacyFields(entry).className,
+            entry.week_type || withLegacyFields(entry).weekType,
         ]
             .filter(Boolean)
             .join(' ')
@@ -838,7 +854,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
         </div>
     );
 
-    const renderCellContent = (dayIndex: number, slotIndex: number, selectedEntries: AvailableClassEntry[], hasOptions: boolean, isSearchMatch: boolean) => {
+    const renderCellContent = (dayIndex: number, slotIndex: number, selectedEntries: AvailableClassEntry[], hasOptions: boolean) => {
         const oddEntry = selectedEntries.find(e => e.week_type === 'odd');
         const evenEntry = selectedEntries.find(e => e.week_type === 'even');
         const fullEntry = selectedEntries.find(e => e.week_type === 'all');
@@ -1004,7 +1020,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                             </div>
 
                             {/* Day headers */}
-                            {DAYS.map((day, index) => (
+                            {DAYS.map((day) => (
                                 <div
                                     key={day}
                                     className="day-header panel"
@@ -1034,7 +1050,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                     drag="x"
                                     dragConstraints={{ left: 0, right: 0 }}
                                     dragElastic={1}
-                                    onDragEnd={(e, { offset, velocity }) => {
+                                    onDragEnd={(e, { offset }) => {
                                         const swipe = Math.abs(offset.x) > 50;
                                         if (swipe) {
                                             if (offset.x > 0) {
@@ -1095,7 +1111,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                                 }
                                                             }}
                                                         >
-                                                            {renderCellContent(currentDayIndex, slotIndex, selectedEntries, hasOptions, isSearchMatch)}
+                                                            {renderCellContent(currentDayIndex, slotIndex, selectedEntries, hasOptions)}
                                                         </div>
                                                     </div>
                                                 );
@@ -1205,7 +1221,7 @@ export default function Planner({ onSaveRef, onCountChange, onSavingChange, clas
                                                 }
                                             }}
                                         >
-                                            {renderCellContent(dayIndex, slotIndex, selectedEntries, hasOptions, isSearchMatch)}
+                                            {renderCellContent(dayIndex, slotIndex, selectedEntries, hasOptions)}
                                         </div>
                                     );
                                 })}

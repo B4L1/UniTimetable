@@ -1,7 +1,7 @@
 // Zustand store for web app
 
 import { create } from 'zustand';
-import { webStorage } from './webStorage';
+import { webStorage, type AppUser } from './webStorage';
 import type { ClassInfo, TimetableEntry, Preferences } from '@shared/lib/types';
 import { DEFAULT_PREFERENCES, migrateColorTheme, migrateBackgroundEffect } from '@shared/lib/types';
 import { 
@@ -69,15 +69,8 @@ interface AppState {
     removeCustomEntry: (entryId: string) => Promise<void>;
 
     // User authentication
-    user: {
-        email: string;
-        name: string;
-        picture: string;
-        role: 'student' | 'teacher';
-        googleId: string;
-        selectionId?: string;
-    } | null;
-    setUser: (user: any) => Promise<void>;
+    user: AppUser | null;
+    setUser: (user: AppUser | null) => Promise<void>;
     logout: () => Promise<void>;
 }
 
@@ -116,11 +109,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
 
     setSelectedTeacher: async (teacher) => {
-        // @ts-ignore
-        if (webStorage.setSelectedTeacher) {
-            // @ts-ignore
-            await webStorage.setSelectedTeacher(teacher);
-        }
+        await webStorage.setSelectedTeacher(teacher);
         set({ selectedTeacher: teacher, selectedClass: null });
 
         const { user, preferences } = get();
