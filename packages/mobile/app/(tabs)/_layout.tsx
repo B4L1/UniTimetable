@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
-import { palette, radius } from '@/constants/theme';
+import { palette, fonts } from '@/constants/theme';
 
 // Simple icon components (can be replaced with proper icons later)
 const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => (
@@ -17,7 +17,7 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: styles.tabBar,
-                tabBarActiveTintColor: palette.accentHover,
+                tabBarActiveTintColor: palette.accent,
                 tabBarInactiveTintColor: palette.textSecondary,
                 tabBarLabelStyle: styles.tabBarLabel,
             }}
@@ -49,8 +49,8 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
     tabBar: {
-        backgroundColor: palette.bgCard,
-        borderTopColor: palette.glassBorder,
+        backgroundColor: palette.bgSurface,
+        borderTopColor: palette.borderDefault,
         borderTopWidth: 1,
         paddingTop: 8,
         paddingBottom: 8,
@@ -59,6 +59,7 @@ const styles = StyleSheet.create({
     tabBarLabel: {
         fontSize: 12,
         fontWeight: '500',
+        fontFamily: fonts.sansMedium,
     },
     iconContainer: {
         alignItems: 'center',
