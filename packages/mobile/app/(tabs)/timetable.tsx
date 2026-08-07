@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 import { useAppStore, TimetableEntry } from '@/stores/appStore';
 import { fetchTimetableEntries, getSubjectColor, getCurrentWeekParity, assignSubjectColors } from '@unitimetable/shared';
-import { palette, radius } from '@/constants/theme';
+import { palette, radius, fonts } from '@/constants/theme';
 import { syncWidget } from '@/widget/widget-sync';
 
 const DAYS = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek'];
@@ -234,33 +234,40 @@ export default function TimetableScreen() {
                                                 slotEntries.map((entry, i) => {
                                                     const subjectColor = getSubjectColor(entry.subject_name);
                                                     return (
-                                                    <View
-                                                        key={i}
-                                                        style={[
-                                                            styles.classCard,
-                                                            {
-                                                                backgroundColor: `${subjectColor}80`,
-                                                                borderColor: `${subjectColor}`,
-                                                            },
-                                                        ]}
-                                                    >
-                                                        <Text style={styles.className} numberOfLines={2}>
-                                                            {entry.subject_name}
-                                                        </Text>
-                                                        {entry.teacher_name && (
-                                                            <Text style={styles.classTeacher} numberOfLines={1}>
-                                                                {entry.teacher_name}
+                                                    <View key={i} style={styles.classCard}>
+                                                        <View style={styles.classCardBar}>
+                                                            <View
+                                                                style={[
+                                                                    styles.classCardBarHalf,
+                                                                    { backgroundColor: subjectColor, opacity: entry.week_type === 'even' ? 0.35 : 1 },
+                                                                ]}
+                                                            />
+                                                            <View
+                                                                style={[
+                                                                    styles.classCardBarHalf,
+                                                                    { backgroundColor: subjectColor, opacity: entry.week_type === 'odd' ? 0.35 : 1 },
+                                                                ]}
+                                                            />
+                                                        </View>
+                                                        <View style={styles.classCardContent}>
+                                                            <Text style={styles.className} numberOfLines={2}>
+                                                                {entry.subject_name}
                                                             </Text>
-                                                        )}
-                                                        <View style={styles.classRoomRow}>
-                                                            <Text style={styles.classRoom}>
-                                                                {entry.classroom}
-                                                            </Text>
-                                                            {entry.week_type !== 'all' && (
-                                                                <Text style={styles.weekBadge}>
-                                                                    {entry.week_type === 'odd' ? '1. hét' : '2. hét'}
+                                                            {entry.teacher_name && (
+                                                                <Text style={styles.classTeacher} numberOfLines={1}>
+                                                                    {entry.teacher_name}
                                                                 </Text>
                                                             )}
+                                                            <View style={styles.classRoomRow}>
+                                                                <Text style={styles.classRoom}>
+                                                                    {entry.classroom}
+                                                                </Text>
+                                                                {entry.week_type !== 'all' && (
+                                                                    <Text style={styles.weekBadge}>
+                                                                        {entry.week_type === 'odd' ? '1. hét' : '2. hét'}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
                                                         </View>
                                                     </View>
                                                     );
@@ -285,7 +292,7 @@ export default function TimetableScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: palette.bgPrimary,
+        backgroundColor: palette.bgApp,
     },
     // Day selector
     daySelector: {
@@ -299,21 +306,24 @@ const styles = StyleSheet.create({
     dayPill: {
         width: 48,
         height: 36,
-        borderRadius: 18,
+        borderRadius: radius.sm,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        backgroundColor: palette.bgSurface,
+        borderWidth: 1,
+        borderColor: palette.borderSubtle,
     },
     dayPillActive: {
-        backgroundColor: palette.accent,
+        borderColor: palette.accent,
+        borderBottomWidth: 2,
     },
     dayPillText: {
         fontSize: 15,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textSecondary,
     },
     dayPillTextActive: {
-        color: '#ffffff',
+        color: palette.accent,
     },
     // Header
     header: {
@@ -325,12 +335,13 @@ const styles = StyleSheet.create({
     },
     dayTitle: {
         fontSize: 24,
-        fontWeight: '700',
-        color: '#ffffff',
+        fontFamily: fonts.sansBold,
+        color: palette.textPrimary,
     },
     weekType: {
         fontSize: 13,
-        color: 'rgba(255, 255, 255, 0.4)',
+        fontFamily: fonts.mono,
+        color: palette.textTertiary,
     },
     // Pager
     pager: {
@@ -357,12 +368,13 @@ const styles = StyleSheet.create({
     },
     timeLabelText: {
         fontSize: 13,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.5)',
+        fontFamily: fonts.monoMedium,
+        color: palette.textSecondary,
     },
     timeLabelEnd: {
         fontSize: 11,
-        color: 'rgba(255, 255, 255, 0.25)',
+        fontFamily: fonts.mono,
+        color: palette.textTertiary,
         marginTop: 2,
     },
     slotContent: {
@@ -376,31 +388,40 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 2,
-        backgroundColor: '#ef4444',
+        backgroundColor: palette.danger,
         zIndex: 10,
-        borderRadius: 1,
     },
-    // Class card — subject-colored, mirrors web .class-card
+    // Class card — neutral surface, subject colour lives on the top bar
     classCard: {
         borderRadius: radius.md,
         borderWidth: 1,
-        padding: 12,
+        borderColor: palette.borderDefault,
+        backgroundColor: palette.bgElevated,
         marginBottom: 4,
         minHeight: SLOT_HEIGHT - 8,
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    classCardBar: {
+        flexDirection: 'row',
+        height: 3,
+    },
+    classCardBarHalf: {
+        flex: 1,
+    },
+    classCardContent: {
+        padding: 12,
     },
     className: {
         fontSize: 15,
-        fontWeight: '600',
-        color: '#ffffff',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textPrimary,
         marginBottom: 4,
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
     },
     classTeacher: {
         fontSize: 13,
-        color: 'rgba(255, 255, 255, 0.85)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
         marginBottom: 4,
     },
     classRoomRow: {
@@ -410,14 +431,16 @@ const styles = StyleSheet.create({
     },
     classRoom: {
         fontSize: 12,
-        fontWeight: '500',
-        color: 'rgba(255, 255, 255, 0.9)',
+        fontFamily: fonts.monoMedium,
+        color: palette.textPrimary,
     },
     weekBadge: {
         fontSize: 11,
-        fontWeight: '600',
-        color: '#ffffff',
-        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+        fontFamily: fonts.monoMedium,
+        color: palette.textSecondary,
+        backgroundColor: palette.bgInset,
+        borderWidth: 1,
+        borderColor: palette.borderSubtle,
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: radius.xs,
@@ -428,14 +451,14 @@ const styles = StyleSheet.create({
         minHeight: SLOT_HEIGHT - 8,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 12,
+        borderRadius: radius.md,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.04)',
+        borderColor: palette.borderSubtle,
         borderStyle: 'dashed',
     },
     emptySlotText: {
         fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.15)',
+        color: palette.textTertiary,
     },
     // Empty state (no class selected)
     emptyContainer: {
@@ -450,13 +473,14 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 24,
-        fontWeight: '600',
-        color: '#ffffff',
+        fontFamily: fonts.sansSemiBold,
+        color: palette.textPrimary,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.6)',
+        fontFamily: fonts.sans,
+        color: palette.textSecondary,
         textAlign: 'center',
     },
 });
