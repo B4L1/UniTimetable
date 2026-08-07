@@ -14,6 +14,20 @@ const SEM2_END = new Date('2026-05-31');
 const BREAK2_START = new Date('2026-04-06');
 const BREAK2_END = new Date('2026-04-12');
 
+export interface SemesterBounds {
+    semester: 1 | 2;
+    start: Date;
+    end: Date;
+}
+
+/** Exported so callers that need an actual date range (ICS export's
+ *  recurrence UNTIL, anchoring odd/even parity) don't re-derive it — this
+ *  file stays the one place that knows the semester dates. */
+export const SEMESTERS: readonly SemesterBounds[] = [
+    { semester: 1, start: SEM1_START, end: SEM1_END },
+    { semester: 2, start: SEM2_START, end: SEM2_END },
+];
+
 export type WeekType = 'odd' | 'even' | 'break' | 'out_of_term';
 
 export interface AcademicWeek {
