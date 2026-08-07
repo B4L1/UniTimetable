@@ -1,4 +1,0 @@
-Class 0f57dbf6-0519-4950-a412-0b481fe571d6, Subject "Nyelvgyakorlat VI. (A) szem." has multiple entries: 08:00:00, 10:00:00
-Class 9b2be1df-9949-40ce-9c42-a0d69bce340b, Subject "Nyelvgyakorlat VI. (A) szem." has multiple entries: 12:30:00, 14:30:00
-Class 486e1731-90ef-4d22-b0ca-adde7edaa990, Subject "Modern gyártási rendsz. a mechatronikában e.a." has multiple entries: 08:00:00, 10:00:00
-Class 8625a68d-2e2e-43d3-b93d-0d59cef88ccf, Subject "Modern gyártási rendsz. a mechatronikában e.a." has multiple entries: 08:00:00, 10:00:00

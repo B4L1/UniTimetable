@@ -39,6 +39,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# scratch/debug output (scraper dumps, typecheck logs, ad-hoc analysis JSON)
+/*.log
+/teacher_debug.png
+
 # generated native folders
 /ios
 /android
