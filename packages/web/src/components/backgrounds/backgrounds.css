@@ -1,0 +1,84 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Ambient backgrounds — CSS only, static, theme-aware.
+
+   Both sit behind everything and never intercept a pointer. They are drawn
+   with `background-image` gradients rather than elements so the whole thing
+   is one paint with no DOM cost, and both fade out toward the bottom of the
+   viewport so content in the lower half always sits on a plain surface.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.app-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* Fade the texture out over the lower two-thirds — a grid that runs edge
+       to edge reads as a debugging overlay, one that fades reads as paper. */
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.35) 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.35) 55%, transparent 100%);
+}
+
+/* ── Grid: ruled engineering paper ────────────────────────────────────
+   A 96px major square subdivided into 24px minors, the minor lines lighter.
+   The two scales matter: a single-scale grid looks like a CSS demo, two
+   scales looks like it was drawn for measuring something. */
+.app-ambient--grid {
+    background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+    background-position: -1px -1px;
+    opacity: 0.9;
+}
+
+/* The minor grid is the 3rd/4th layer; knock it back with its own opacity by
+   painting it on a pseudo-element instead of trying to vary alpha per layer. */
+.app-ambient--grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: -1px -1px;
+    opacity: 0.45;
+}
+
+/* ── Dots: plotter registration marks ─────────────────────────────────
+   Quieter than the grid. Better under the planner, where the UI already has
+   a lot of its own ruling and a second grid would moiré against it. */
+.app-ambient--dots {
+    background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+    opacity: 0.8;
+}
+
+/* ── Terminal easter egg ──────────────────────────────────────────────
+   Scanlines, replacing what the WebGL FaultyTerminal effect used to do, at
+   roughly none of the cost. This one does animate — slowly — because the
+   whole point of the theme is that it looks like failing hardware. */
+.app-ambient--scan {
+    background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 255, 65, 0.05) 0px,
+        rgba(0, 255, 65, 0.05) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    animation: ambient-scan 8s linear infinite;
+}
+
+@keyframes ambient-scan {
+    from { background-position-y: 0; }
+    to   { background-position-y: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-ambient--scan {
+        animation: none;
+    }
+}

@@ -44,5 +44,11 @@
   "include": [
     "src",
     "../shared"
+  ],
+  /* src/_archive holds retired components kept for reference only (see
+     src/_archive/README.md). Nothing imports them, and several depend on
+     packages that have been removed, so they must not be type-checked. */
+  "exclude": [
+    "src/_archive"
   ]
 }

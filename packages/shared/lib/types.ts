@@ -60,24 +60,32 @@ export interface Course {
 /**
  * Color theme — a pure CSS token map, synced across devices.
  * 'light'      Sapientia (default)
- * 'dark'       basic dark, solid surfaces
- * 'dark-glass' dark with frosted/translucent surfaces
+ * 'dark'       flat dark
  * 'terminal'   easter-egg theme (unlockable)
  * Seasonal themes (christmas, easter, …) slot in here later as token-only additions.
+ *
+ * 'dark-glass' is retired (the frosted look was dropped in the v4 redesign).
+ * It stays in the union ONLY so that preferences already persisted on a
+ * user's device keep type-checking; migrateColorTheme folds it into 'dark'.
  */
 export type ColorTheme = 'light' | 'dark' | 'dark-glass' | 'terminal';
 
 /**
- * Animated background effect — independent of the color theme,
- * device-local (never synced), lazy-loaded, off by default.
+ * Ambient background — independent of the color theme, device-local (never
+ * synced), off by default.
+ *
+ * v4: these are CSS textures, not WebGL scenes. The old effect ids are gone;
+ * anything still stored under one of them falls back to 'none'. See
+ * packages/web/src/_archive/README.md.
  */
 export type BackgroundEffect =
     | 'none'
-    | 'aurora'
-    | 'pixel-blast'
-    | 'iridescence'
-    | 'liquid-chrome'
-    | 'faulty-terminal';
+    /** Ruled engineering paper — major/minor grid. */
+    | 'grid'
+    /** Sparse registration dots; quieter, for busy screens. */
+    | 'dots'
+    /** CRT scanlines. Easter-egg, pairs with the terminal theme. */
+    | 'scan';
 
 /** @deprecated pre-v3 combined theme+background value; kept only so stored
  *  preferences from older clients can be migrated. */
@@ -114,8 +122,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
     invertWeekParity: false,
 };
 
-/** Derive the v3 colorTheme from possibly-old stored preferences. */
+/** Derive the current colorTheme from possibly-old stored preferences. */
 export function migrateColorTheme(stored: Partial<Preferences> | null): ColorTheme {
+    // 'dark-glass' was the frosted variant, retired in v4. Fold it into plain
+    // dark rather than leaving users on a theme with no stylesheet behind it.
+    if (stored?.colorTheme === 'dark-glass') return 'dark';
     if (stored?.colorTheme) return stored.colorTheme;
     const bg = stored?.backgroundTheme;
     if (!bg || bg === 'sapientia') return 'light';
@@ -123,19 +134,16 @@ export function migrateColorTheme(stored: Partial<Preferences> | null): ColorThe
     return 'dark';
 }
 
-/** Derive the initial device-local background effect from old stored preferences. */
-export function migrateBackgroundEffect(stored: Partial<Preferences> | null): BackgroundEffect {
-    const bg = stored?.backgroundTheme;
-    switch (bg) {
-        case 'aurora':
-        case 'pixel-blast':
-        case 'iridescence':
-        case 'liquid-chrome':
-        case 'faulty-terminal':
-            return bg;
-        default:
-            return 'none';
-    }
+/**
+ * Derive the device-local ambient background from old stored preferences.
+ *
+ * Every pre-v4 value named a WebGL effect that no longer exists. Rather than
+ * guess a CSS texture for each, they all return 'none': the ambient is
+ * decoration, it was off by default, and silently switching someone's
+ * background to something they never chose is worse than switching it off.
+ */
+export function migrateBackgroundEffect(_stored: Partial<Preferences> | null): BackgroundEffect {
+    return 'none';
 }
 
 export interface SelectedClass {

@@ -1,19 +1,20 @@
-// Animated background effect — DEVICE-LOCAL preference.
+// Ambient background — DEVICE-LOCAL preference.
 //
-// Deliberately not synced to Supabase: enabling a heavy WebGL background on a
-// desktop must never slow down the same account's phone. Off by default,
-// lazy-loaded on selection, force-disabled under prefers-reduced-motion.
+// Still device-local rather than synced: the background is a matter of where
+// you're sitting, not who you are, and someone may well want the grid on a
+// large monitor and nothing on a phone.
+//
+// v4: the ambients are CSS textures (see components/backgrounds/), so the old
+// performance warning is gone — there is nothing left to be slow. Anything
+// still stored under a retired WebGL effect id fails the VALID check below and
+// falls back to 'none'.
 
 import { useSyncExternalStore } from 'react';
 import type { BackgroundEffect } from '@shared/lib/types';
 
 const STORAGE_KEY = 'uni-bg-effect';
-/** Set once the user has acknowledged the performance warning. */
-const WARNING_ACK_KEY = 'uni-bg-effect-warning-ack';
 
-const VALID: BackgroundEffect[] = [
-    'none', 'aurora', 'pixel-blast', 'iridescence', 'liquid-chrome', 'faulty-terminal',
-];
+const VALID: BackgroundEffect[] = ['none', 'grid', 'dots', 'scan'];
 
 export function prefersReducedMotion(): boolean {
     return typeof window !== 'undefined'
@@ -23,14 +24,6 @@ export function prefersReducedMotion(): boolean {
 export function getBackgroundEffect(): BackgroundEffect {
     const stored = localStorage.getItem(STORAGE_KEY) as BackgroundEffect | null;
     return stored && VALID.includes(stored) ? stored : 'none';
-}
-
-export function hasAcknowledgedPerfWarning(): boolean {
-    return localStorage.getItem(WARNING_ACK_KEY) === '1';
-}
-
-export function acknowledgePerfWarning(): void {
-    localStorage.setItem(WARNING_ACK_KEY, '1');
 }
 
 // -- Tiny external store so any component can subscribe to effect changes -----
