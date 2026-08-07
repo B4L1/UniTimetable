@@ -47,4 +47,7 @@ The `--clean` prebuild matters: the widget receiver only gets added when the con
 - **Widget shows the full class timetable**, not planner selections — same as the mobile app's timetable screen. When the mobile app gains login + planner sync, point `widget-data.ts` at the selected-entries cache.
 - **Web still has its own calendar copy** (`web/src/utils/calendar.ts`) — migrate it to the new `@shared/calendar` and delete the copy.
 - iOS widget would need a native WidgetKit extension (Swift) — separate effort, not covered by react-native-android-widget.
-- Mobile planner/onboarding got the palette swap but not a deep restyle pass; screens are functional and on-palette.
+- **Visual restyle to Blueprint v4 done** (2026-08-07): tokens, fonts, and the
+  subject-colour-on-a-bar card treatment now match web across all screens and
+  the widget. Feature parity (PlannerWizard, ClassDetailModal, subject import,
+  toasts) is still open — see `docs/superpowers/specs/2026-08-07-mobile-blueprint-v4-restyle-design.md`.
